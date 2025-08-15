@@ -86,7 +86,21 @@ export class DashboardService {
 
       const completedAssessments = myAssignments?.filter(a => a.is_completed).length || 0
       const pendingAssessments = myAssignments?.filter(a => !a.is_completed).length || 0
-      const myProgress = totalEmployees > 0 ? Math.round((completedAssessments / totalEmployees) * 100) : 0
+      
+      // Calculate progress based on actual assignments, not total employees
+      const totalAssignments = myAssignments?.length || 0
+      const myProgress = totalAssignments > 0 ? Math.round((completedAssessments / totalAssignments) * 100) : 0
+
+      // Debug logging for progress calculation
+      console.log('Progress Calculation Debug:', {
+        totalEmployees,
+        totalAssignments,
+        completedAssessments,
+        pendingAssessments,
+        myProgress,
+        userId,
+        periodId: currentPeriod.id
+      })
 
       // Get my average rating from feedback received
       const { data: myFeedback, error: feedbackError } = await supabase

@@ -1,125 +1,185 @@
 // src/lib/notification-service.ts
-import { supabase } from '../../lib/supabase'
+import { supabase } from './supabase'
+import type { Database } from './database.types'
 
-// Basic notification types for now
-export interface Notification {
-  id: string
-  user_id: string
-  title: string
-  message: string
-  type: 'reminder' | 'deadline' | 'completion' | 'system'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  is_read: boolean
-  action_url?: string
-  action_label?: string
-  metadata?: Record<string, any>
-  created_at: string
-  updated_at: string
+// Type definitions from database
+type NotificationRow = Database['public']['Tables']['notifications']['Row']
+type NotificationInsert = Database['public']['Tables']['notifications']['Insert']
+type NotificationUpdate = Database['public']['Tables']['notifications']['Update']
+
+type NotificationPreferencesRow = Database['public']['Tables']['notification_preferences']['Row']
+type NotificationPreferencesInsert = Database['public']['Tables']['notification_preferences']['Insert']
+type NotificationPreferencesUpdate = Database['public']['Tables']['notification_preferences']['Update']
+
+// Export interfaces that match database structure
+export interface Notification extends NotificationRow {}
+export interface NotificationInsertType extends NotificationInsert {}
+export interface NotificationPreferences extends NotificationPreferencesRow {}
+
+export interface NotificationAnalytics {
+  total_notifications: number
+  unread_count: number
+  read_count: number
+  type_distribution: Record<string, number>
+  priority_distribution: Record<string, number>
+  response_time_average: number
+  engagement_rate: number
+  last_activity: string | null
 }
-
-export interface NotificationInsert {
-  user_id: string
-  title: string
-  message: string
-  type: 'reminder' | 'deadline' | 'completion' | 'system'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  action_url?: string
-  action_label?: string
-  metadata?: Record<string, any>
-}
-
-// In-memory storage for notifications (temporary solution)
-const notificationsStore = new Map<string, Notification[]>()
 
 export class NotificationService {
-  // Get user notifications from local storage
+  // Get user notifications from database
   static async getUserNotifications(userId: string, limit = 50): Promise<Notification[]> {
-    const userNotifications = notificationsStore.get(userId) || []
-    return userNotifications
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, limit)
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.error('Failed to get user notifications:', error)
+      return []
+    }
   }
 
   // Get unread count
   static async getUnreadCount(userId: string): Promise<number> {
-    const userNotifications = notificationsStore.get(userId) || []
-    return userNotifications.filter(n => !n.is_read).length
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+
+      if (error) throw error
+      return count || 0
+    } catch (error) {
+      console.error('Failed to get unread count:', error)
+      return 0
+    }
   }
 
   // Mark notification as read
   static async markAsRead(notificationId: string): Promise<void> {
-    for (const [userId, notifications] of notificationsStore.entries()) {
-      const notification = notifications.find(n => n.id === notificationId)
-      if (notification) {
-        notification.is_read = true
-        notification.updated_at = new Date().toISOString()
-        notificationsStore.set(userId, notifications)
-        break
-      }
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, updated_at: new Date().toISOString() })
+        .eq('id', notificationId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Failed to mark as read:', error)
+      throw error
     }
   }
 
   // Mark all as read
   static async markAllAsRead(userId: string): Promise<void> {
-    const userNotifications = notificationsStore.get(userId) || []
-    userNotifications.forEach(notification => {
-      notification.is_read = true
-      notification.updated_at = new Date().toISOString()
-    })
-    notificationsStore.set(userId, userNotifications)
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true, updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Failed to mark all as read:', error)
+      throw error
+    }
   }
 
   // Delete notification
   static async deleteNotification(notificationId: string): Promise<void> {
-    for (const [userId, notifications] of notificationsStore.entries()) {
-      const filteredNotifications = notifications.filter(n => n.id !== notificationId)
-      if (filteredNotifications.length !== notifications.length) {
-        notificationsStore.set(userId, filteredNotifications)
-        break
-      }
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Failed to delete notification:', error)
+      throw error
     }
   }
 
   // Create notification
-  static async createNotification(notification: NotificationInsert): Promise<Notification> {
-    const newNotification: Notification = {
-      id: crypto.randomUUID(),
-      ...notification,
-      is_read: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+  static async createNotification(notification: NotificationInsertType): Promise<Notification> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert([notification])
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Failed to create notification:', error)
+      throw error
     }
-
-    const userNotifications = notificationsStore.get(notification.user_id) || []
-    userNotifications.push(newNotification)
-    notificationsStore.set(notification.user_id, userNotifications)
-
-    return newNotification
   }
 
-  // Bulk create notifications
-  static async createBulkNotifications(notifications: NotificationInsert[]): Promise<Notification[]> {
-    const createdNotifications: Notification[] = []
-    
-    for (const notification of notifications) {
-      const created = await this.createNotification(notification)
-      createdNotifications.push(created)
-    }
+  // Bulk create notifications - ADD DETAILED LOGGING
+  static async createBulkNotifications(notifications: NotificationInsertType[]): Promise<Notification[]> {
+    try {
+      console.log('Creating bulk notifications:', notifications)
+      
+      // Validate data before sending
+      const validatedNotifications = notifications.map(notification => {
+        const validated = {
+          user_id: notification.user_id,
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          priority: notification.priority || 'medium',
+          action_url: notification.action_url || null,
+          action_label: notification.action_label || null,
+          metadata: notification.metadata || null
+        }
+        console.log('Validated notification:', validated)
+        return validated
+      })
 
-    return createdNotifications
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert(validatedNotifications)
+        .select()
+
+      if (error) {
+        console.error('Supabase error details:', error)
+        throw error
+      }
+      
+      console.log('Successfully created notifications:', data)
+      return data || []
+    } catch (error) {
+      console.error('Failed to create bulk notifications:', error)
+      throw error
+    }
   }
 
   // Send reminder notification
   static async sendReminderNotification(userId: string, assignmentCount: number): Promise<Notification> {
-    const notification: NotificationInsert = {
+    const notification: NotificationInsertType = {
       user_id: userId,
-      title: 'Reminder: Pending Assessments',
-      message: `You have ${assignmentCount} pending assessment${assignmentCount > 1 ? 's' : ''} to complete.`,
+      title: '📋 Pengingat: Penilaian Menunggu',
+      message: `Anda memiliki ${assignmentCount} penilaian yang belum diselesaikan. Silakan lengkapi untuk periode ini.`,
       type: 'reminder',
-      priority: 'medium',
+      priority: assignmentCount >= 5 ? 'urgent' : assignmentCount >= 3 ? 'high' : 'medium',
       action_url: '/assessment',
-      action_label: 'Complete Now',
-      metadata: { assignment_count: assignmentCount }
+      action_label: 'Mulai Penilaian',
+      metadata: { 
+        assignment_count: assignmentCount,
+        reminder_type: 'assessment_pending',
+        generated_at: new Date().toISOString()
+      }
     }
 
     return this.createNotification(notification)
@@ -128,16 +188,21 @@ export class NotificationService {
   // Send deadline warning
   static async sendDeadlineWarning(userId: string, daysLeft: number): Promise<Notification> {
     const priority = daysLeft <= 1 ? 'urgent' : daysLeft <= 3 ? 'high' : 'medium'
+    const emoji = daysLeft <= 1 ? '🚨' : daysLeft <= 3 ? '⚠️' : '📅'
     
-    const notification: NotificationInsert = {
+    const notification: NotificationInsertType = {
       user_id: userId,
-      title: 'Assessment Deadline Approaching',
-      message: `Assessment period ends in ${daysLeft} day${daysLeft > 1 ? 's' : ''}. Complete your pending assessments now.`,
+      title: `${emoji} ${daysLeft <= 1 ? 'URGENT: ' : ''}Deadline Mendekati`,
+      message: `Periode penilaian akan berakhir dalam ${daysLeft} hari${daysLeft > 1 ? '' : ' lagi'}. Pastikan semua penilaian telah diselesaikan!`,
       type: 'deadline',
       priority,
       action_url: '/assessment',
-      action_label: 'Complete Assessments',
-      metadata: { days_left: daysLeft }
+      action_label: 'Selesaikan Sekarang',
+      metadata: { 
+        days_left: daysLeft,
+        urgency_level: priority,
+        deadline_type: 'assessment_period'
+      }
     }
 
     return this.createNotification(notification)
@@ -145,293 +210,298 @@ export class NotificationService {
 
   // Send completion notification
   static async sendCompletionNotification(userId: string, assesseeName: string): Promise<Notification> {
-    const notification: NotificationInsert = {
+    const notification: NotificationInsertType = {
       user_id: userId,
-      title: 'Assessment Completed',
-      message: `You have successfully completed the assessment for ${assesseeName}.`,
+      title: '🎉 Penilaian Berhasil Diselesaikan',
+      message: `Terima kasih telah menyelesaikan penilaian untuk ${assesseeName}. Feedback Anda sangat berharga!`,
       type: 'completion',
       priority: 'low',
-      action_url: '/dashboard',
-      action_label: 'View Dashboard',
-      metadata: { assessee_name: assesseeName }
+      action_url: '/my-results',
+      action_label: 'Lihat Hasil',
+      metadata: { 
+        assessee_name: assesseeName,
+        completion_type: 'individual_assessment',
+        celebration: true
+      }
     }
 
     return this.createNotification(notification)
   }
 
-  // Send system notification
+  // Send assessment invitation
+  static async sendAssessmentInvitation(userId: string, periodInfo: any): Promise<Notification> {
+    const notification: NotificationInsertType = {
+      user_id: userId,
+      title: '🎯 Undangan Penilaian 360° Baru',
+      message: `Anda diundang untuk berpartisipasi dalam penilaian 360° periode ${periodInfo.month}/${periodInfo.year}. Mari berkontribusi untuk pengembangan tim!`,
+      type: 'assessment',
+      priority: 'high',
+      action_url: '/assessment',
+      action_label: 'Lihat Detail',
+      metadata: {
+        period_id: periodInfo.id,
+        month: periodInfo.month,
+        year: periodInfo.year,
+        invitation_type: 'new_period'
+      }
+    }
+
+    return this.createNotification(notification)
+  }
+
+  // Send system notification - ADD VALIDATION
   static async sendSystemNotification(
     userIds: string[], 
     title: string, 
     message: string, 
-    actionUrl?: string
+    actionUrl?: string,
+    priority: string = 'medium'
   ): Promise<Notification[]> {
+    console.log('sendSystemNotification called with:', { userIds, title, message, actionUrl, priority })
+    
+    // Validate inputs
+    if (!userIds || userIds.length === 0) {
+      console.error('No user IDs provided')
+      return []
+    }
+
+    if (!title || !message) {
+      console.error('Title or message is empty')
+      return []
+    }
+
     const notifications = userIds.map(userId => ({
       user_id: userId,
-      title,
-      message,
-      type: 'system' as const,
-      priority: 'medium' as const,
-      action_url: actionUrl,
-      action_label: actionUrl ? 'View Details' : undefined
+      title: title.substring(0, 255), // Ensure title is not too long
+      message: message.substring(0, 1000), // Ensure message is not too long
+      type: 'system',
+      priority: priority,
+      action_url: actionUrl || null,
+      action_label: actionUrl ? 'Lihat Detail' : null,
+      metadata: {
+        system_notification: true,
+        broadcast: userIds.length > 1,
+        sent_at: new Date().toISOString()
+      }
     }))
 
+    console.log('Prepared notifications:', notifications)
     return this.createBulkNotifications(notifications)
   }
 
-  // Subscribe to real-time notifications (simulated)
-  static subscribeToNotifications(userId: string, callback: (notification: Notification) => void) {
-    // Simulate real-time by checking every 5 seconds
-    const interval = setInterval(async () => {
-      const unreadNotifications = await this.getUserNotifications(userId, 1)
-      const unread = unreadNotifications.filter(n => !n.is_read)
-      if (unread.length > 0) {
-        callback(unread[0])
-      }
-    }, 5000)
-
-    // Return unsubscribe function
-    return () => clearInterval(interval)
-  }
-
-  // Clean up old notifications
-  static async cleanupOldNotifications(daysOld = 30): Promise<void> {
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld)
-
-    for (const [userId, notifications] of notificationsStore.entries()) {
-      const filteredNotifications = notifications.filter(
-        notification => new Date(notification.created_at) > cutoffDate
-      )
-      notificationsStore.set(userId, filteredNotifications)
-    }
-  }
-
-  // Initialize with some sample notifications
-  static async initializeSampleNotifications(userId: string): Promise<void> {
-    const existingNotifications = notificationsStore.get(userId) || []
-    if (existingNotifications.length === 0) {
-      await this.sendSystemNotification(
-        [userId],
-        'Welcome to BPS Kota Batu 360° Feedback',
-        'Your account has been successfully created. You can now start using the assessment system.',
-        '/dashboard'
-      )
-    }
-  }
-
-  // Advanced notification preferences management
+  // Get notification preferences
   static async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
-    // Simulate database call with advanced caching and fallback
-    const defaultPreferences: NotificationPreferences = {
-      user_id: userId,
-      email_notifications: true,
-      push_notifications: true,
-      reminder_frequency: 'daily',
-      quiet_hours_start: '22:00',
-      quiet_hours_end: '08:00',
-      priority_levels: ['urgent', 'high'],
-      notification_types: ['reminder', 'deadline', 'completion', 'system'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
 
-    // In a real implementation, this would query the database
-    // For now, return default preferences with advanced logic
-    return Promise.resolve(defaultPreferences);
+      if (error && error.code !== 'PGRST116') throw error
+      
+      if (!data) {
+        // Create default preferences if none exist
+        const defaultPreferences: NotificationPreferencesInsert = {
+          user_id: userId,
+          email_enabled: true,
+          push_enabled: true,
+          assessment_reminders: true,
+          deadline_warnings: true,
+          completion_notifications: true,
+          system_notifications: true,
+          reminder_frequency: 'daily',
+          quiet_hours_start: '22:00',
+          quiet_hours_end: '08:00'
+        }
+
+        const { data: newPrefs, error: createError } = await supabase
+          .from('notification_preferences')
+          .insert([defaultPreferences])
+          .select()
+          .single()
+
+        if (createError) throw createError
+        return newPrefs
+      }
+
+      return data
+    } catch (error) {
+      console.error('Failed to get notification preferences:', error)
+      // Return default preferences on error
+      return {
+        id: '',
+        user_id: userId,
+        email_enabled: true,
+        push_enabled: true,
+        assessment_reminders: true,
+        deadline_warnings: true,
+        completion_notifications: true,
+        system_notifications: true,
+        reminder_frequency: 'daily',
+        quiet_hours_start: '22:00',
+        quiet_hours_end: '08:00',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    }
   }
 
-  // Advanced preference update with validation
+  // Update notification preferences
   static async updateNotificationPreferences(
     userId: string, 
     preferences: Partial<NotificationPreferences>
   ): Promise<NotificationPreferences> {
-    // Advanced validation logic
-    const validatedPreferences = this.validateNotificationPreferences(preferences);
-    
-    // Simulate database update
-    const updatedPreferences: NotificationPreferences = {
-      user_id: userId,
-      email_notifications: validatedPreferences.email_notifications ?? true,
-      push_notifications: validatedPreferences.push_notifications ?? true,
-      reminder_frequency: validatedPreferences.reminder_frequency ?? 'daily',
-      quiet_hours_start: validatedPreferences.quiet_hours_start ?? '22:00',
-      quiet_hours_end: validatedPreferences.quiet_hours_end ?? '08:00',
-      priority_levels: validatedPreferences.priority_levels ?? ['urgent', 'high'],
-      notification_types: validatedPreferences.notification_types ?? ['reminder', 'deadline', 'completion', 'system'],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .upsert({
+          user_id: userId,
+          ...preferences,
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
 
-    return Promise.resolve(updatedPreferences);
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Failed to update notification preferences:', error)
+      throw error
+    }
   }
 
-  // Advanced validation for notification preferences
-  private static validateNotificationPreferences(preferences: Partial<NotificationPreferences>): Partial<NotificationPreferences> {
-    const validated: Partial<NotificationPreferences> = { ...preferences };
+  // Subscribe to real-time notifications
+  static subscribeToNotifications(userId: string, callback: (notification: Notification) => void) {
+    const subscription = supabase
+      .channel('notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          callback(payload.new as Notification)
+        }
+      )
+      .subscribe()
 
-    // Validate quiet hours format
-    if (validated.quiet_hours_start && !this.isValidTimeFormat(validated.quiet_hours_start)) {
-      validated.quiet_hours_start = '22:00';
+    return () => {
+      supabase.removeChannel(subscription)
     }
-    if (validated.quiet_hours_end && !this.isValidTimeFormat(validated.quiet_hours_end)) {
-      validated.quiet_hours_end = '08:00';
-    }
-
-    // Validate reminder frequency
-    if (validated.reminder_frequency && !['hourly', 'daily', 'weekly', 'monthly'].includes(validated.reminder_frequency)) {
-      validated.reminder_frequency = 'daily';
-    }
-
-    // Validate priority levels
-    if (validated.priority_levels && Array.isArray(validated.priority_levels)) {
-      validated.priority_levels = validated.priority_levels.filter(level => 
-        ['low', 'medium', 'high', 'urgent'].includes(level)
-      );
-    }
-
-    // Validate notification types
-    if (validated.notification_types && Array.isArray(validated.notification_types)) {
-      validated.notification_types = validated.notification_types.filter(type => 
-        ['reminder', 'deadline', 'completion', 'system', 'assessment'].includes(type)
-      );
-    }
-
-    return validated;
   }
 
-  // Advanced time format validation
-  private static isValidTimeFormat(time: string): boolean {
-    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    return timeRegex.test(time);
-  }
+  // Initialize sample notifications for new users
+  static async initializeSampleNotifications(userId: string): Promise<void> {
+    try {
+      const existingCount = await this.getUnreadCount(userId)
+      if (existingCount > 0) return // User already has notifications
 
-  // Advanced assessment reminder with intelligent scheduling
-  static async sendAssessmentReminder(userId: string, assignmentCount: number): Promise<Notification> {
-    // Advanced logic for determining priority based on assignment count and deadline
-    const priority = this.calculateReminderPriority(assignmentCount);
-    
-    const notification: NotificationInsert = {
-      user_id: userId,
-      title: 'Assessment Reminder: Action Required',
-      message: this.generateReminderMessage(assignmentCount),
-      type: 'reminder',
-      priority,
-      action_url: '/assessment',
-      action_label: 'Complete Assessments',
-      metadata: { 
-        assignment_count: assignmentCount,
-        reminder_type: 'assessment',
-        priority_level: priority,
-        generated_at: new Date().toISOString()
-      }
+      // Create welcome notification
+      await this.sendSystemNotification(
+        [userId],
+        '🎉 Selamat Datang di BPS Kota Batu 360° Feedback!',
+        'Akun Anda telah berhasil dibuat. Anda sekarang dapat mulai menggunakan sistem penilaian untuk memberikan feedback yang berharga kepada rekan kerja.',
+        '/dashboard',
+        'medium'
+      )
+
+      // Create sample assessment reminder
+      await this.sendReminderNotification(userId, 2)
+
+      // Create sample tip notification
+      await this.sendSystemNotification(
+        [userId],
+        '💡 Tips: Memberikan Feedback yang Efektif',
+        'Berikan feedback yang spesifik, konstruktif, dan actionable. Fokus pada perilaku dan dampaknya, bukan pada kepribadian.',
+        undefined,
+        'low'
+      )
+
+    } catch (error) {
+      console.error('Failed to initialize sample notifications:', error)
     }
-
-    return this.createNotification(notification);
   }
 
-  // Advanced priority calculation algorithm
-  private static calculateReminderPriority(assignmentCount: number): 'low' | 'medium' | 'high' | 'urgent' {
-    if (assignmentCount >= 5) return 'urgent';
-    if (assignmentCount >= 3) return 'high';
-    if (assignmentCount >= 1) return 'medium';
-    return 'low';
-  }
+  // Clean up old notifications
+  static async cleanupOldNotifications(daysOld = 30): Promise<void> {
+    try {
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld)
 
-  // Advanced message generation with contextual information
-  private static generateReminderMessage(assignmentCount: number): string {
-    const baseMessage = `You have ${assignmentCount} pending assessment${assignmentCount > 1 ? 's' : ''} to complete.`;
-    
-    if (assignmentCount >= 5) {
-      return `${baseMessage} This is a high priority task that requires immediate attention.`;
-    } else if (assignmentCount >= 3) {
-      return `${baseMessage} Please prioritize completing these assessments soon.`;
-    } else if (assignmentCount >= 1) {
-      return `${baseMessage} Take your time to provide thoughtful feedback.`;
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('is_read', true)
+        .lt('created_at', cutoffDate.toISOString())
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Failed to cleanup old notifications:', error)
     }
-    
-    return baseMessage;
   }
 
-  // Advanced notification analytics and insights
+  // Get notification analytics
   static async getNotificationAnalytics(userId: string): Promise<NotificationAnalytics> {
-    const userNotifications = notificationsStore.get(userId) || [];
-    
-    const analytics: NotificationAnalytics = {
-      total_notifications: userNotifications.length,
-      unread_count: userNotifications.filter(n => !n.is_read).length,
-      read_count: userNotifications.filter(n => n.is_read).length,
-      type_distribution: this.calculateTypeDistribution(userNotifications),
-      priority_distribution: this.calculatePriorityDistribution(userNotifications),
-      response_time_average: this.calculateAverageResponseTime(userNotifications),
-      engagement_rate: this.calculateEngagementRate(userNotifications),
-      last_activity: userNotifications.length > 0 ? userNotifications[0].created_at : null
-    };
+    try {
+      const notifications = await this.getUserNotifications(userId, 1000)
+      
+      const analytics: NotificationAnalytics = {
+        total_notifications: notifications.length,
+        unread_count: notifications.filter(n => !n.is_read).length,
+        read_count: notifications.filter(n => n.is_read).length,
+        type_distribution: this.calculateTypeDistribution(notifications),
+        priority_distribution: this.calculatePriorityDistribution(notifications),
+        response_time_average: this.calculateAverageResponseTime(notifications),
+        engagement_rate: this.calculateEngagementRate(notifications),
+        last_activity: notifications.length > 0 ? notifications[0].created_at : null
+      }
 
-    return Promise.resolve(analytics);
+      return analytics
+    } catch (error) {
+      console.error('Failed to get notification analytics:', error)
+      throw error
+    }
   }
 
-  // Advanced type distribution calculation
+  // Helper methods
   private static calculateTypeDistribution(notifications: Notification[]): Record<string, number> {
-    const distribution: Record<string, number> = {};
+    const distribution: Record<string, number> = {}
     notifications.forEach(notification => {
-      distribution[notification.type] = (distribution[notification.type] || 0) + 1;
-    });
-    return distribution;
+      const type = notification.type || 'unknown'
+      distribution[type] = (distribution[type] || 0) + 1
+    })
+    return distribution
   }
 
-  // Advanced priority distribution calculation
   private static calculatePriorityDistribution(notifications: Notification[]): Record<string, number> {
-    const distribution: Record<string, number> = {};
+    const distribution: Record<string, number> = {}
     notifications.forEach(notification => {
-      distribution[notification.priority] = (distribution[notification.priority] || 0) + 1;
-    });
-    return distribution;
+      const priority = notification.priority || 'medium'
+      distribution[priority] = (distribution[priority] || 0) + 1
+    })
+    return distribution
   }
 
-  // Advanced response time calculation
   private static calculateAverageResponseTime(notifications: Notification[]): number {
-    const readNotifications = notifications.filter(n => n.is_read);
-    if (readNotifications.length === 0) return 0;
+    const readNotifications = notifications.filter(n => n.is_read)
+    if (readNotifications.length === 0) return 0
 
     const totalResponseTime = readNotifications.reduce((total, notification) => {
-      const created = new Date(notification.created_at).getTime();
-      const updated = new Date(notification.updated_at).getTime();
-      return total + (updated - created);
-    }, 0);
+      const created = new Date(notification.created_at).getTime()
+      const updated = new Date(notification.updated_at).getTime()
+      return total + (updated - created)
+    }, 0)
 
-    return totalResponseTime / readNotifications.length;
+    return totalResponseTime / readNotifications.length
   }
 
-  // Advanced engagement rate calculation
   private static calculateEngagementRate(notifications: Notification[]): number {
-    if (notifications.length === 0) return 0;
-    const readCount = notifications.filter(n => n.is_read).length;
-    return (readCount / notifications.length) * 100;
+    if (notifications.length === 0) return 0
+    const readCount = notifications.filter(n => n.is_read).length
+    return (readCount / notifications.length) * 100
   }
-}
-
-// Advanced interfaces for comprehensive notification system
-export interface NotificationPreferences {
-  user_id: string;
-  email_notifications: boolean;
-  push_notifications: boolean;
-  reminder_frequency: 'hourly' | 'daily' | 'weekly' | 'monthly';
-  quiet_hours_start: string;
-  quiet_hours_end: string;
-  priority_levels: string[];
-  notification_types: string[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface NotificationAnalytics {
-  total_notifications: number;
-  unread_count: number;
-  read_count: number;
-  type_distribution: Record<string, number>;
-  priority_distribution: Record<string, number>;
-  response_time_average: number;
-  engagement_rate: number;
-  last_activity: string | null;
 }

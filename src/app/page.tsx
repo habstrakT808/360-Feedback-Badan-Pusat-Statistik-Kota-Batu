@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
-  Building2,
   BarChart3,
   Users,
   Award,
@@ -32,6 +31,7 @@ import {
   Linkedin,
   Globe,
   X,
+  Youtube,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
@@ -88,14 +88,24 @@ export default function HomePage() {
     getUser();
   }, [setUser, router]);
 
-  // Scroll snap effect
+  // Scroll snap effect - Disabled on mobile
   useEffect(() => {
+    const isMobile = window.innerWidth <= 768;
+
+    if (isMobile) {
+      // Disable scroll snap on mobile for better UX
+      return;
+    }
+
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
 
+      // Allow scrolling to footer section
       if (e.deltaY > 0 && currentSection < sectionsRef.current.length - 1) {
+        console.log('Scrolling down to section:', currentSection + 1);
         setCurrentSection((prev) => prev + 1);
       } else if (e.deltaY < 0 && currentSection > 0) {
+        console.log('Scrolling up to section:', currentSection - 1);
         setCurrentSection((prev) => prev - 1);
       }
     };
@@ -108,21 +118,62 @@ export default function HomePage() {
   }, [currentSection]);
 
   useEffect(() => {
+    const isMobile = window.innerWidth <= 768;
     const targetSection = sectionsRef.current[currentSection];
+
     if (targetSection) {
-      targetSection.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      // Special handling for footer section on desktop
+      const isFooterSection = currentSection === 3;
+      const scrollBlock = isFooterSection && !isMobile ? "center" : "start";
+
+      if (isFooterSection && !isMobile) {
+        // Center the footer section properly with precise positioning
+        console.log('Scrolling to footer section with precise positioning');
+        setTimeout(() => {
+          const footerElement = targetSection;
+          const viewportHeight = window.innerHeight;
+          const footerHeight = footerElement.offsetHeight;
+          const scrollTop = footerElement.offsetTop - (viewportHeight - footerHeight) / 2;
+          
+          console.log('Footer scroll calculation:', { viewportHeight, footerHeight, scrollTop });
+          
+          // Try both methods to ensure footer is visible
+          try {
+            footerElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center"
+            });
+          } catch (error) {
+            console.log('Fallback to window.scrollTo');
+            window.scrollTo({
+              top: scrollTop,
+              behavior: "smooth"
+            });
+          }
+        }, 100);
+      } else {
+        targetSection.scrollIntoView({
+          behavior: isMobile ? "auto" : "smooth",
+          block: scrollBlock,
+        });
+      }
     }
   }, [currentSection]);
 
   useEffect(() => {
+    const isMobile = window.innerWidth <= 768;
+
+    if (isMobile) {
+      // Disable keyboard navigation on mobile
+      return;
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === "ArrowDown" &&
         currentSection < sectionsRef.current.length - 1
       ) {
+        // Allow scrolling to footer section
         setCurrentSection((prev) => prev + 1);
       } else if (e.key === "ArrowUp" && currentSection > 0) {
         setCurrentSection((prev) => prev - 1);
@@ -246,9 +297,9 @@ export default function HomePage() {
   );
 
   return (
-    <div ref={containerRef} className="relative overflow-hidden">
-      {/* Navigation Dots */}
-      <div className="fixed right-8 top-1/2 transform -translate-y-1/2 z-40 space-y-3">
+    <div ref={containerRef} className="relative overflow-x-hidden main-container">
+      {/* Navigation Dots - Hidden on mobile */}
+      <div className="fixed right-8 top-1/2 transform -translate-y-1/2 z-40 space-y-3 hidden lg:block">
         {[0, 1, 2, 3].map((index) => (
           <button
             key={index}
@@ -266,15 +317,21 @@ export default function HomePage() {
       <motion.nav
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="fixed top-0 left-0 right-0 z-30 px-6 py-4 bg-white/80 backdrop-blur-md border-b border-gray-200/50"
+        className="fixed top-0 left-0 right-0 z-30 px-4 sm:px-6 py-3 sm:py-4 bg-white/80 backdrop-blur-md border-b border-gray-200/50"
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-white" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+              <img
+                src="/logo-bps.png"
+                alt="BPS Logo"
+                className="w-6 h-6 sm:w-8 sm:h-8 object-contain"
+              />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">BPS Kota Batu</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">
+                BPS Kota Batu
+              </h1>
               <p className="text-xs text-gray-600">360° Feedback System</p>
             </div>
           </div>
@@ -283,7 +340,7 @@ export default function HomePage() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setIsAuthModalOpen(true)}
-            className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-lg"
+            className="flex items-center space-x-2 bg-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl hover:bg-blue-700 transition-colors shadow-lg text-sm sm:text-base"
           >
             <LogIn className="w-4 h-4" />
             <span className="font-medium">Masuk</span>
@@ -296,7 +353,7 @@ export default function HomePage() {
         ref={(el) => {
           sectionsRef.current[0] = el;
         }}
-        className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center pt-20"
+        className="section-snap bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 pt-20 pb-8"
       >
         <div className="max-w-7xl mx-auto px-6 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -320,7 +377,7 @@ export default function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="text-4xl lg:text-6xl font-bold text-gray-900 leading-tight"
+                  className="text-3xl sm:text-4xl lg:text-6xl font-bold text-gray-900 leading-tight"
                 >
                   360° Feedback
                   <span className="block bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -332,7 +389,7 @@ export default function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
-                  className="text-xl text-gray-600 leading-relaxed"
+                  className="text-lg sm:text-xl text-gray-600 leading-relaxed"
                 >
                   Platform penilaian kinerja komprehensif untuk Badan Pusat
                   Statistik Kota Batu. Dapatkan feedback anonim dari rekan kerja
@@ -343,7 +400,7 @@ export default function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
-                  className="flex flex-col sm:flex-row gap-4"
+                  className="flex flex-col sm:flex-row gap-3 sm:gap-4"
                 >
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -352,7 +409,7 @@ export default function HomePage() {
                       setAuthMode("register");
                       setIsAuthModalOpen(true);
                     }}
-                    className="flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-4 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg font-semibold"
+                    className="flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg font-semibold text-sm sm:text-base"
                   >
                     <UserPlus className="w-5 h-5" />
                     <span>Mulai Sekarang</span>
@@ -365,7 +422,7 @@ export default function HomePage() {
                       setAuthMode("login");
                       setIsAuthModalOpen(true);
                     }}
-                    className="flex items-center justify-center space-x-2 bg-white text-gray-700 px-8 py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-lg border border-gray-200 font-semibold"
+                    className="flex items-center justify-center space-x-2 bg-white text-gray-700 px-6 sm:px-8 py-3 sm:py-4 rounded-xl hover:bg-gray-50 transition-colors shadow-lg border border-gray-200 font-semibold text-sm sm:text-base"
                   >
                     <span>Sudah Punya Akun</span>
                     <ArrowRight className="w-5 h-5" />
@@ -380,7 +437,7 @@ export default function HomePage() {
               transition={{ duration: 0.8, delay: 0.2 }}
               className="relative"
             >
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-4 sm:gap-6">
                 {stats.map((stat, index) => (
                   <motion.div
                     key={stat.label}
@@ -388,17 +445,19 @@ export default function HomePage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.6 + index * 0.1 }}
                     whileHover={{ y: -4, scale: 1.02 }}
-                    className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+                    className="bg-white rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
                   >
                     <div className="flex items-center space-x-3 mb-3">
                       <div className="p-2 bg-blue-100 rounded-xl">
                         <stat.icon className="w-5 h-5 text-blue-600" />
                       </div>
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 mb-1">
+                    <div className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
                       {stat.number}
                     </div>
-                    <div className="text-gray-600 text-sm">{stat.label}</div>
+                    <div className="text-gray-600 text-xs sm:text-sm">
+                      {stat.label}
+                    </div>
                   </motion.div>
                 ))}
               </div>
@@ -423,7 +482,7 @@ export default function HomePage() {
         ref={(el) => {
           sectionsRef.current[1] = el;
         }}
-        className="h-screen bg-white flex items-center justify-center overflow-hidden"
+        className="section-snap bg-white py-16"
       >
         <div className="max-w-6xl mx-auto px-6">
           <motion.div
@@ -441,7 +500,7 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {features.map((feature, index) => (
               <motion.div
                 key={feature.title}
@@ -449,17 +508,17 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1, duration: 0.5 }}
                 whileHover={{ y: -8, scale: 1.05 }}
-                className={`group bg-gradient-to-br ${feature.gradient} rounded-2xl p-6 hover:shadow-xl transition-all duration-300 border border-gray-100`}
+                className={`group bg-gradient-to-br ${feature.gradient} rounded-2xl p-4 sm:p-6 hover:shadow-xl transition-all duration-300 border border-gray-100`}
               >
                 <div
                   className={`w-12 h-12 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg`}
                 >
                   <feature.icon className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600 leading-relaxed text-sm">
+                <p className="text-gray-600 leading-relaxed text-xs sm:text-sm">
                   {feature.description}
                 </p>
               </motion.div>
@@ -473,7 +532,7 @@ export default function HomePage() {
         ref={(el) => {
           sectionsRef.current[2] = el;
         }}
-        className="h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center relative overflow-hidden"
+        className="section-snap bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 relative overflow-hidden py-16"
       >
         <div className="absolute inset-0">
           <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
@@ -486,16 +545,16 @@ export default function HomePage() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
               Siap Meningkatkan
               <span className="block">Performa Tim?</span>
             </h2>
-            <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-lg sm:text-xl text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
               Bergabunglah dengan sistem penilaian 360° dan rasakan perbedaannya
               dalam pengembangan karir dan kinerja tim yang lebih baik
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center mb-8 sm:mb-12">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -503,7 +562,7 @@ export default function HomePage() {
                   setAuthMode("register");
                   setIsAuthModalOpen(true);
                 }}
-                className="bg-white text-blue-600 px-8 py-4 rounded-2xl hover:bg-gray-50 transition-colors shadow-2xl font-bold text-lg flex items-center space-x-3"
+                className="bg-white text-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-2xl hover:bg-gray-50 transition-colors shadow-2xl font-bold text-base sm:text-lg flex items-center space-x-3"
               >
                 <UserPlus className="w-6 h-6" />
                 <span>Mulai Gratis Sekarang</span>
@@ -516,7 +575,7 @@ export default function HomePage() {
                   setAuthMode("login");
                   setIsAuthModalOpen(true);
                 }}
-                className="bg-white/10 backdrop-blur-sm text-white px-8 py-4 rounded-2xl hover:bg-white/20 transition-colors border border-white/20 font-bold text-lg flex items-center space-x-3"
+                className="bg-white/10 backdrop-blur-sm text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl hover:bg-white/20 transition-colors border border-white/20 font-bold text-base sm:text-lg flex items-center space-x-3"
               >
                 <LogIn className="w-6 h-6" />
                 <span>Sudah Punya Akun</span>
@@ -547,25 +606,30 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Section 4: Footer - DIPERBAIKI LAGI */}
+      {/* Section 4: Footer - DIPERBAIKI */}
       <div
         ref={(el) => {
           sectionsRef.current[3] = el;
         }}
-        className="h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center relative overflow-hidden"
+        className="footer-section bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col justify-center relative overflow-hidden py-8"
       >
-        <div className="max-w-5xl mx-auto px-6 w-full relative z-10">
+        <div className="max-w-5xl mx-auto px-6 w-full relative z-10 flex flex-col justify-center h-full">
+          {/* Main Footer Content */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-center space-y-6"
+            className="text-center space-y-6 flex-1 flex flex-col justify-center"
           >
             {/* Logo & Brand - Lebih kecil */}
             <div className="space-y-4">
               <div className="flex items-center justify-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Building2 className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                  <img
+                    src="/logo-bps.png"
+                    alt="BPS Logo"
+                    className="w-10 h-10 object-contain"
+                  />
                 </div>
                 <div className="text-left">
                   <h1 className="text-xl lg:text-2xl font-bold text-white">
@@ -585,12 +649,12 @@ export default function HomePage() {
             </div>
 
             {/* Contact Grid - Lebih kompak */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10"
+                className="bg-white/5 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-white/10"
               >
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <MapPin className="w-4 h-4 text-white" />
@@ -598,17 +662,18 @@ export default function HomePage() {
                 <h4 className="text-white font-semibold mb-1 text-sm">
                   Alamat Kantor
                 </h4>
-                <p className="text-gray-300 text-xs">Jl. Veteran No. 10</p>
                 <p className="text-gray-300 text-xs">
-                  Kota Batu, Jawa Timur 65314
+                  Jl. Melati No. 11.Songgokerto
                 </p>
+                <p className="text-gray-300 text-xs">Kota Batu</p>
+                <p className="text-gray-300 text-xs">Jawa Timur</p>
               </motion.div>
 
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10"
+                className="bg-white/5 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-white/10"
               >
                 <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Mail className="w-4 h-4 text-white" />
@@ -616,15 +681,15 @@ export default function HomePage() {
                 <h4 className="text-white font-semibold mb-1 text-sm">
                   Kontak
                 </h4>
-                <p className="text-gray-300 text-xs">admin@bpsbatu.go.id</p>
-                <p className="text-gray-300 text-xs">+62 341 123456</p>
+                <p className="text-gray-300 text-xs">(0341) 512575</p>
+                <p className="text-gray-300 text-xs">bps3579@bps.go.id</p>
               </motion.div>
 
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-white/10"
+                className="bg-white/5 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-white/10"
               >
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Clock className="w-4 h-4 text-white" />
@@ -642,20 +707,36 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="space-y-3"
+              className="space-y-4 mb-8"
             >
               <h4 className="text-white font-semibold text-sm">Ikuti Kami</h4>
-              <div className="flex justify-center space-x-2">
+              <div className="flex justify-center space-x-2 flex-wrap gap-2">
                 {[
                   {
                     icon: Globe,
                     color: "bg-blue-600",
-                    href: "https://bpsbatu.go.id",
+                    href: "https://batukota.bps.go.id/id",
                   },
-                  { icon: Facebook, color: "bg-blue-700", href: "#" },
-                  { icon: Twitter, color: "bg-sky-500", href: "#" },
-                  { icon: Instagram, color: "bg-pink-600", href: "#" },
-                  { icon: Linkedin, color: "bg-blue-800", href: "#" },
+                  {
+                    icon: Facebook,
+                    color: "bg-blue-700",
+                    href: "https://www.facebook.com/bpsbatu/?locale=id_ID",
+                  },
+                  {
+                    icon: Twitter,
+                    color: "bg-sky-500",
+                    href: "https://x.com/bps_statistics",
+                  },
+                  {
+                    icon: Instagram,
+                    color: "bg-pink-600",
+                    href: "https://www.instagram.com/bpskotabatu/",
+                  },
+                  {
+                    icon: Youtube,
+                    color: "bg-red-600",
+                    href: "https://www.youtube.com/channel/UC_pcLwhiv5VU5y7WNVIA1pQ",
+                  },
                 ].map((social, index) => (
                   <motion.a
                     key={index}
@@ -671,34 +752,34 @@ export default function HomePage() {
                 ))}
               </div>
             </motion.div>
-
-            {/* Bottom Bar - Lebih kompak */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="border-t border-white/10 pt-4 space-y-2"
-            >
-              <p className="text-gray-400 text-xs">
-                © 2024 Badan Pusat Statistik Kota Batu. Semua hak dilindungi
-                undang-undang.
-              </p>
-              <div className="flex justify-center items-center space-x-3 text-gray-400 text-xs">
-                <a href="#" className="hover:text-white transition-colors">
-                  Kebijakan Privasi
-                </a>
-                <span>•</span>
-                <a href="#" className="hover:text-white transition-colors">
-                  Syarat & Ketentuan
-                </a>
-                <span>•</span>
-                <a href="#" className="hover:text-white transition-colors">
-                  Bantuan
-                </a>
-              </div>
-            </motion.div>
           </motion.div>
         </div>
+
+        {/* Bottom Bar */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="border-t border-white/10 pt-4 pb-2 space-y-2 px-6 mt-auto"
+        >
+          <p className="text-gray-400 text-xs text-center mb-2">
+            © 2025 Badan Pusat Statistik Kota Batu. Semua hak dilindungi
+            undang-undang.
+          </p>
+          <div className="flex justify-center items-center space-x-3 text-gray-400 text-xs">
+            <a href="#" className="hover:text-white transition-colors">
+              Kebijakan Privasi
+            </a>
+            <span>•</span>
+            <a href="#" className="hover:text-white transition-colors">
+              Syarat & Ketentuan
+            </a>
+            <span>•</span>
+            <a href="#" className="hover:text-white transition-colors">
+              Bantuan
+            </a>
+          </div>
+        </motion.div>
 
         {/* Decorative Elements - Lebih kecil */}
         <div className="absolute top-20 right-20 w-16 h-16 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full blur-2xl"></div>
@@ -727,8 +808,12 @@ export default function HomePage() {
                 <div className="p-6 border-b border-gray-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-white" />
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                        <img
+                          src="/logo-bps.png"
+                          alt="BPS Logo"
+                          className="w-8 h-8 object-contain"
+                        />
                       </div>
                       <div>
                         <h2 className="text-xl font-bold text-gray-900">
@@ -764,7 +849,7 @@ export default function HomePage() {
                             {...loginForm.register("email")}
                             type="email"
                             className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                            placeholder="nama@bpsbatu.go.id"
+                            placeholder="nama@bps.go.id"
                           />
                         </div>
                         {loginForm.formState.errors.email && (
@@ -888,7 +973,7 @@ export default function HomePage() {
                           {...registerForm.register("email")}
                           type="email"
                           className="block w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                          placeholder="nama@bpsbatu.go.id"
+                          placeholder="nama@bps.go.id"
                         />
                         {registerForm.formState.errors.email && (
                           <p className="mt-1 text-sm text-red-600">

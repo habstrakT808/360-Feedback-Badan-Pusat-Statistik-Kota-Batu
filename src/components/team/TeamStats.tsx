@@ -32,6 +32,9 @@ export function TeamStats({ teamData, assignmentStats }: TeamStatsProps) {
     (emp) => (emp.averageRating || 0) < 6
   ).length;
 
+  // Calculate total assignments for the current period (should be 5 employees)
+  const totalAssignments = totalEmployees; // Since we assess 5 employees per month
+
   const stats = [
     {
       title: "Total Karyawan",
@@ -44,7 +47,7 @@ export function TeamStats({ teamData, assignmentStats }: TeamStatsProps) {
     {
       title: "Rata-rata Tim",
       value: avgTeamRating.toFixed(1),
-      suffix: "/10",
+      suffix: "/5",
       icon: TrendingUp,
       color: "bg-green-500",
       bgColor: "bg-green-100",
@@ -72,7 +75,7 @@ export function TeamStats({ teamData, assignmentStats }: TeamStatsProps) {
     {
       title: "Penilaian Selesai",
       value: assignmentStats.stats.completed,
-      total: assignmentStats.stats.total,
+      total: totalAssignments,
       icon: CheckCircle,
       color: "text-green-600",
       bgColor: "bg-green-100",
@@ -80,7 +83,7 @@ export function TeamStats({ teamData, assignmentStats }: TeamStatsProps) {
     {
       title: "Masih Pending",
       value: assignmentStats.stats.pending,
-      total: assignmentStats.stats.total,
+      total: totalAssignments,
       icon: Clock,
       color: "text-orange-600",
       bgColor: "bg-orange-100",

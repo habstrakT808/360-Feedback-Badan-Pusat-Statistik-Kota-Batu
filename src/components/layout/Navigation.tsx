@@ -127,8 +127,8 @@ export function Navigation() {
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center space-x-3"
             >
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                <img src="/logo-bps.png" alt="BPS Logo" className="w-8 h-8 object-contain" />
               </div>
               <div>
                 <h1 className="text-xl font-bold">BPS Kota Batu</h1>

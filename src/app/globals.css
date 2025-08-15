@@ -44,9 +44,111 @@ body {
   @apply from-blue-500 to-blue-700;
 }
 
-/* Smooth scrolling */
+/* Smooth scrolling - Disabled on mobile */
 html {
   scroll-behavior: smooth;
+}
+
+/* Footer section specific styles */
+.footer-section {
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding-bottom: 0 !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure footer content is properly centered */
+.footer-section > div {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Remove any extra bottom spacing from footer */
+.footer-section *:last-child {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Ensure footer section takes exactly viewport height */
+.footer-section {
+  height: 100vh !important;
+  min-height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: visible !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* Allow content to be properly visible */
+.footer-section > * {
+  max-height: none !important;
+}
+
+/* Main container scroll behavior */
+.main-container {
+  scroll-snap-type: y proximity;
+  overflow-y: auto;
+  height: 100vh;
+  scroll-behavior: smooth;
+}
+
+/* Ensure sections can be scrolled to */
+.section-snap,
+.footer-section {
+  scroll-snap-align: start;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Section scroll snap */
+.section-snap {
+  scroll-snap-align: start;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Prevent horizontal scrolling on mobile */
+  .overflow-x-hidden {
+    overflow-x: hidden;
+  }
+
+  /* Ensure proper touch scrolling */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Disable scroll snap on mobile */
+  .main-container {
+    scroll-snap-type: none;
+    overflow-y: auto;
+    height: auto;
+  }
+
+  .section-snap,
+  .footer-section {
+    scroll-snap-align: none;
+    min-height: auto;
+    height: auto !important;
+    max-height: none !important;
+    display: block;
+    overflow: visible !important;
+  }
 }
 
 /* Loading animation */

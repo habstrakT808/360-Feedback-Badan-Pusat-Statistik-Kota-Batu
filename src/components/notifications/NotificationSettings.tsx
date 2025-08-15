@@ -62,7 +62,7 @@ export function NotificationSettings() {
 
   const updatePreference = (key: string, value: any) => {
     setPreferences((prev: any) => ({
-      ...prev,
+      ...prev || getDefaultPreferences(),
       [key]: value,
     }));
   };
@@ -266,7 +266,7 @@ export function NotificationSettings() {
               </label>
               <input
                 type="time"
-                value={preferences.quiet_hours_start}
+                value={preferences?.quiet_hours_start || "22:00"}
                 onChange={(e) =>
                   updatePreference("quiet_hours_start", e.target.value)
                 }
@@ -279,7 +279,7 @@ export function NotificationSettings() {
               </label>
               <input
                 type="time"
-                value={preferences.quiet_hours_end}
+                value={preferences?.quiet_hours_end || "08:00"}
                 onChange={(e) =>
                   updatePreference("quiet_hours_end", e.target.value)
                 }

@@ -11,6 +11,17 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata = {
   title: "BPS Kota Batu - 360° Feedback System",
   description: "Sistem Penilaian Kinerja Karyawan BPS Kota Batu",
+  icons: {
+    icon: "/logo-bps.png",
+    shortcut: "/logo-bps.png",
+    apple: "/logo-bps.png",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 };
 
 export default function RootLayout({

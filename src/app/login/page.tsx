@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "../../../lib/supabase";
 import { toast } from "react-hot-toast";
-import { Eye, EyeOff, Mail, Lock, Building2 } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Email tidak valid"),
@@ -68,8 +68,12 @@ export default function LoginPage() {
           transition={{ delay: 0.2 }}
           className="text-center mb-8"
         >
-          <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mb-4">
-            <Building2 className="w-8 h-8 text-white" />
+          <div className="mx-auto w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+            <img
+              src="/logo-bps.png"
+              alt="BPS Logo"
+              className="w-12 h-12 object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             BPS Kota Batu
@@ -98,7 +102,7 @@ export default function LoginPage() {
                   {...register("email")}
                   type="email"
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder="nama@bpsbatu.go.id"
+                  placeholder="nama@bps.go.id"
                 />
               </div>
               {errors.email && (

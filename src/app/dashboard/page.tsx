@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExportButton } from "@/components/export/ExportButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { DashboardService, DashboardStats } from "@/lib/dashboard-service";
+import { SmartNotificationService } from "@/lib/smart-notification-service";
 import { useStore } from "@/store/useStore";
 import {
   Users,
@@ -42,6 +43,12 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       loadDashboardData();
+      // Generate personalized notifications (non-blocking)
+      SmartNotificationService.generatePersonalizedNotifications(user.id).catch(
+        (error) => {
+          console.error("Failed to generate smart notifications:", error);
+        }
+      );
     }
   }, [user]);
 
