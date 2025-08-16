@@ -129,23 +129,47 @@ export class NotificationService {
   // Bulk create notifications - ADD DETAILED LOGGING
   static async createBulkNotifications(notifications: NotificationInsertType[]): Promise<Notification[]> {
     try {
-      console.log('Creating bulk notifications:', notifications)
+      console.log('Creating bulk notifications:', notifications.length, 'items')
       
-      // Validate data before sending
-      const validatedNotifications = notifications.map(notification => {
+      if (!notifications || notifications.length === 0) {
+        console.log('No notifications to create')
+        return []
+      }
+
+      // Validate and clean data
+      const validatedNotifications = notifications.map((notification, index) => {
+        if (!notification.user_id) {
+          throw new Error(`Missing user_id for notification ${index}`)
+        }
+        if (!notification.title) {
+          throw new Error(`Missing title for notification ${index}`)
+        }
+        if (!notification.message) {
+          throw new Error(`Missing message for notification ${index}`)
+        }
+
         const validated = {
           user_id: notification.user_id,
-          title: notification.title,
-          message: notification.message,
-          type: notification.type,
+          title: notification.title.substring(0, 255), // Ensure within limit
+          message: notification.message.substring(0, 1000), // Ensure within limit
+          type: notification.type || 'system',
           priority: notification.priority || 'medium',
           action_url: notification.action_url || null,
           action_label: notification.action_label || null,
-          metadata: notification.metadata || null
+          metadata: notification.metadata || {}
         }
-        console.log('Validated notification:', validated)
+        
+        console.log(`Validated notification ${index + 1}:`, {
+          user_id: validated.user_id,
+          title: validated.title,
+          type: validated.type,
+          priority: validated.priority
+        })
+        
         return validated
       })
+
+      console.log('Attempting to insert', validatedNotifications.length, 'notifications...')
 
       const { data, error } = await supabase
         .from('notifications')
@@ -153,14 +177,29 @@ export class NotificationService {
         .select()
 
       if (error) {
-        console.error('Supabase error details:', error)
-        throw error
+        console.error('Supabase insert error:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        })
+        throw new Error(`Database insert failed: ${error.message} (Code: ${error.code})`)
       }
       
-      console.log('Successfully created notifications:', data)
-      return data || []
-    } catch (error) {
-      console.error('Failed to create bulk notifications:', error)
+      if (!data) {
+        console.error('No data returned from insert')
+        throw new Error('No data returned from database insert')
+      }
+
+      console.log('Successfully created', data.length, 'notifications')
+      return data
+      
+    } catch (error: any) {
+      console.error('Failed to create bulk notifications:', {
+        error: error.message,
+        stack: error.stack,
+        notificationCount: notifications?.length || 0
+      })
       throw error
     }
   }
@@ -257,36 +296,69 @@ export class NotificationService {
     actionUrl?: string,
     priority: string = 'medium'
   ): Promise<Notification[]> {
-    console.log('sendSystemNotification called with:', { userIds, title, message, actionUrl, priority })
-    
-    // Validate inputs
-    if (!userIds || userIds.length === 0) {
-      console.error('No user IDs provided')
-      return []
-    }
-
-    if (!title || !message) {
-      console.error('Title or message is empty')
-      return []
-    }
-
-    const notifications = userIds.map(userId => ({
-      user_id: userId,
-      title: title.substring(0, 255), // Ensure title is not too long
-      message: message.substring(0, 1000), // Ensure message is not too long
-      type: 'system',
-      priority: priority,
-      action_url: actionUrl || null,
-      action_label: actionUrl ? 'Lihat Detail' : null,
-      metadata: {
-        system_notification: true,
-        broadcast: userIds.length > 1,
-        sent_at: new Date().toISOString()
+    try {
+      console.log('sendSystemNotification called:', { 
+        userCount: userIds?.length || 0, 
+        title: title?.substring(0, 50) + '...', 
+        priority 
+      })
+      
+      // Enhanced validation
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        console.error('Invalid userIds provided:', userIds)
+        throw new Error('No valid user IDs provided')
       }
-    }))
 
-    console.log('Prepared notifications:', notifications)
-    return this.createBulkNotifications(notifications)
+      if (!title || title.trim().length === 0) {
+        console.error('Empty title provided')
+        throw new Error('Title is required and cannot be empty')
+      }
+
+      if (!message || message.trim().length === 0) {
+        console.error('Empty message provided')
+        throw new Error('Message is required and cannot be empty')
+      }
+
+      // Validate priority
+      const validPriorities = ['low', 'medium', 'high', 'urgent']
+      if (!validPriorities.includes(priority)) {
+        console.warn(`Invalid priority "${priority}", using "medium"`)
+        priority = 'medium'
+      }
+
+      // Create notifications array
+      const notifications = userIds.map(userId => {
+        if (!userId || typeof userId !== 'string') {
+          throw new Error(`Invalid user ID: ${userId}`)
+        }
+
+        return {
+          user_id: userId,
+          title: title.trim().substring(0, 255),
+          message: message.trim().substring(0, 1000),
+          type: 'system' as const,
+          priority: priority,
+          action_url: actionUrl || null,
+          action_label: actionUrl ? 'Lihat Detail' : null,
+          metadata: {
+            system_notification: true,
+            broadcast: userIds.length > 1,
+            sent_at: new Date().toISOString()
+          }
+        }
+      })
+
+      console.log('Prepared notifications for', notifications.length, 'users')
+      return await this.createBulkNotifications(notifications)
+      
+    } catch (error: any) {
+      console.error('sendSystemNotification failed:', {
+        error: error.message,
+        userIds: userIds?.length || 0,
+        title: title?.substring(0, 30) || 'undefined'
+      })
+      throw error
+    }
   }
 
   // Get notification preferences

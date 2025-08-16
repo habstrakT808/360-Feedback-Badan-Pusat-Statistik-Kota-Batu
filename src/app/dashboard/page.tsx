@@ -43,12 +43,18 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       loadDashboardData();
-      // Generate personalized notifications (non-blocking)
-      SmartNotificationService.generatePersonalizedNotifications(user.id).catch(
-        (error) => {
-          console.error("Failed to generate smart notifications:", error);
-        }
-      );
+      
+      // Generate notifications only once per session
+      const notificationsGenerated = sessionStorage.getItem(`notifications_${user.id}`)
+      if (!notificationsGenerated) {
+        SmartNotificationService.generateForUser(user.id)
+          .then(() => {
+            sessionStorage.setItem(`notifications_${user.id}`, 'true')
+          })
+          .catch((error) => {
+            console.error("Failed to generate notifications:", error);
+          });
+      }
     }
   }, [user]);
 
