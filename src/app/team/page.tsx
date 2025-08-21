@@ -402,11 +402,19 @@ function SupervisorTeamView() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center">
-                          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <span className="text-white font-semibold text-sm">
-                              {result.user.full_name?.charAt(0) ||
-                                result.user.email?.charAt(0)}
-                            </span>
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                            {result.user.avatar_url ? (
+                              <img
+                                src={result.user.avatar_url}
+                                alt={result.user.full_name || result.user.email}
+                                className="w-10 h-10 object-cover"
+                              />
+                            ) : (
+                              <span className="text-white font-semibold text-sm">
+                                {result.user.full_name?.charAt(0) ||
+                                  result.user.email?.charAt(0)}
+                              </span>
+                            )}
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">

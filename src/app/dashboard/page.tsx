@@ -43,13 +43,15 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       loadDashboardData();
-      
+
       // Generate notifications only once per session
-      const notificationsGenerated = sessionStorage.getItem(`notifications_${user.id}`)
+      const notificationsGenerated = sessionStorage.getItem(
+        `notifications_${user.id}`
+      );
       if (!notificationsGenerated) {
         SmartNotificationServiceImproved.generateForUser(user.id)
           .then(() => {
-            sessionStorage.setItem(`notifications_${user.id}`, 'true')
+            sessionStorage.setItem(`notifications_${user.id}`, "true");
           })
           .catch((error: any) => {
             console.error("Failed to generate notifications:", error);
@@ -100,27 +102,13 @@ export default function Dashboard() {
   };
 
   const itemVariants: Variants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        type: spring,
-        stiffness: 100,
-      },
-    },
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 },
   };
 
   const cardVariants: Variants = {
-    hover: {
-      y: -8,
-      scale: 1.02,
-      transition: {
-        type: spring,
-        stiffness: 400,
-        damping: 10,
-      },
-    },
+    hidden: { scale: 1 },
+    hover: { scale: 1.05, y: -5 },
   };
 
   if (isLoading) {
@@ -195,93 +183,84 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Stats Grid */}
+        {/* Overview Cards */}
         <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
         >
-          <motion.div variants={itemVariants} whileHover="hover">
-            <motion.div
-              variants={cardVariants}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-blue-600/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center relative z-10">
-                <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl shadow-lg">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">
-                    Total Karyawan
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.totalEmployees}
-                  </p>
-                </div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  Total Karyawan
+                </p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.totalEmployees}
+                </p>
               </div>
-            </motion.div>
+              <Users className="w-8 h-8 text-blue-500" />
+            </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} whileHover="hover">
-            <motion.div
-              variants={cardVariants}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500/10 to-green-600/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center relative z-10">
-                <div className="p-3 bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Selesai</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.completedAssessments}
-                  </p>
-                </div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Selesai</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {stats.completedAssessments}
+                </p>
+                <p className="text-xs text-gray-500">
+                  dari {stats.totalEmployees} karyawan
+                </p>
               </div>
-            </motion.div>
+              <CheckCircle className="w-8 h-8 text-green-500" />
+            </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} whileHover="hover">
-            <motion.div
-              variants={cardVariants}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-500/10 to-orange-600/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center relative z-10">
-                <div className="p-3 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-lg">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Pending</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.pendingAssessments}
-                  </p>
-                </div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {stats.pendingAssessments}
+                </p>
+                <p className="text-xs text-gray-500">
+                  dari {stats.totalEmployees} karyawan
+                </p>
               </div>
-            </motion.div>
+              <Clock className="w-8 h-8 text-orange-500" />
+            </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} whileHover="hover">
-            <motion.div
-              variants={cardVariants}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/10 to-purple-600/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center relative z-10">
-                <div className="p-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl shadow-lg">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Progress</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {stats.myProgress}%
-                  </p>
-                </div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Progress</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {stats.myProgress}%
+                </p>
+                <p className="text-xs text-gray-500">
+                  {stats.totalEmployees > 0
+                    ? `${stats.completedAssessments} dari ${stats.totalEmployees} karyawan`
+                    : "Tidak ada karyawan"}
+                </p>
               </div>
-            </motion.div>
+              <TrendingUp className="w-8 h-8 text-purple-500" />
+            </div>
           </motion.div>
         </motion.div>
 
@@ -411,6 +390,27 @@ export default function Dashboard() {
                   transition={{ duration: 1, delay: 1 }}
                   className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full"
                 ></motion.div>
+              </div>
+              {/* Progress Details */}
+              <div className="text-sm text-gray-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Selesai:</span>
+                  <span className="font-medium text-green-600">
+                    {stats.completedAssessments}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Assignment:</span>
+                  <span className="font-medium text-blue-600">
+                    {stats.totalEmployees}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Karyawan:</span>
+                  <span className="font-medium text-gray-600">
+                    {stats.totalEmployees}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

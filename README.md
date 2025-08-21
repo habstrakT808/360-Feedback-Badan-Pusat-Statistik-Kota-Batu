@@ -423,6 +423,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 CRON_SECRET=your_cron_secret_for_automated_tasks
+
+# Optional overrides to define role user IDs without hardcoding in code
+# Comma-separated list of UUIDs
+NEXT_PUBLIC_SUPERVISOR_IDS=
+NEXT_PUBLIC_ADMIN_IDS=
 ```
 
 ## 📝 Development Guidelines

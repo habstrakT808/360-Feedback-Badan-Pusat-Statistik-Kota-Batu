@@ -1,5 +1,6 @@
 // src/lib/results-service.ts (REPLACE COMPLETE FILE)
 import { supabase } from '@/lib/supabase'
+import { RolesService } from '@/lib/roles-service'
 import { Database } from '@/lib/database.types'
 
 type FeedbackResponse = Database['public']['Tables']['feedback_responses']['Row']
@@ -39,22 +40,9 @@ export class ResultsService {
         return []
       }
 
-      // Get user roles to identify supervisor assessments
-      const assessorIds = [...new Set(feedbackData.map((f: any) => f.assignment.assessor_id))]
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', assessorIds)
-
-      // Manual fix: Add known supervisor IDs if not found
-      const herlinaId = '678ad9e9-cc08-4101-b735-6d2e1feaab3a'
-      const supervisorIds = userRoles?.filter(ur => ur.role === 'supervisor').map(ur => ur.user_id) || []
-      const allSupervisorIds = [...new Set([...supervisorIds, herlinaId])]
-      
-      console.log('🔍 ResultsService - Supervisor detection:')
-      console.log('   - User roles from DB:', userRoles)
-      console.log('   - Supervisor IDs from DB:', supervisorIds)
-      console.log('   - All supervisor IDs (with manual fix):', allSupervisorIds)
+      // Get supervisor IDs from roles service with env overrides (no hardcoded IDs)
+      const { supervisorIds: allSupervisorIds } = await RolesService.getRoleUserIds()
+      console.log('🔍 ResultsService - Supervisor IDs:', allSupervisorIds)
 
       // Separate supervisor and peer feedback
       const supervisorFeedback = feedbackData.filter((f: any) => 
@@ -119,6 +107,7 @@ export class ResultsService {
         groups[aspectId].allRatings.push(item.rating)
         groups[aspectId].allAssessors.add(assessorId)
 
+        // Use the isSupervisorFeedback flag that was set in getMyResults
         if (item.isSupervisorFeedback) {
           groups[aspectId].supervisorRatings.push(item.rating)
           groups[aspectId].supervisorAssessors.add(assessorId)

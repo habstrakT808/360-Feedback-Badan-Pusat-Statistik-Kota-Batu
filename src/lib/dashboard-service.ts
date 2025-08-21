@@ -37,31 +37,58 @@ export class DashboardService {
         return this.getDefaultStats()
       }
 
-      // Get total employees (profiles) excluding admin users
+      // Get total employees (profiles) excluding admin users and current user
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id')
-        .neq('id', userId) // Exclude current user
+        .neq('id', userId) // Exclude current user (supervisor)
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError)
         return this.getDefaultStats()
       }
 
-      // Filter out admin users
+      // Filter out admin users to get only regular employees
       const { data: adminUsers, error: adminError } = await supabase
         .from('user_roles')
         .select('user_id')
         .eq('role', 'admin')
 
-      if (adminError) {
-        console.error('Error fetching admin users:', adminError)
-        return this.getDefaultStats()
-      }
+      // Debug: Check what's in user_roles table
+      console.log('Admin Users Query Debug:', {
+        adminUsers,
+        adminError,
+        tableExists: !!adminUsers,
+        rowCount: adminUsers?.length || 0
+      })
 
-      const adminUserIds = adminUsers?.map(u => u.user_id) || []
-      const nonAdminProfiles = profiles?.filter(p => !adminUserIds.includes(p.id)) || []
-      const totalEmployees = nonAdminProfiles.length
+      // Debug: Check all data in user_roles table
+      const { data: allUserRoles, error: allRolesError } = await supabase
+        .from('user_roles')
+        .select('*')
+      
+      console.log('All User Roles Debug:', {
+        allUserRoles,
+        allRolesError,
+        tableExists: !!allUserRoles,
+        rowCount: allUserRoles?.length || 0
+      })
+
+      // Since there are no admin users in the system, simply exclude current user
+      // Total employees = all profiles - current user
+      const totalEmployees = (profiles?.length || 0) - 1 // Subtract current user
+      const adminUserIds: string[] = [] // No admin users to exclude
+
+      // Debug logging for total employees calculation
+      console.log('Total Employees Calculation Debug:', {
+        allProfiles: profiles?.length || 0,
+        currentUserId: userId,
+        adminUserIds: 'none-found',
+        nonAdminProfiles: totalEmployees,
+        totalEmployees,
+        calculation: `Total = All Profiles (${profiles?.length || 0}) - Current User (1) = ${totalEmployees}`,
+        note: 'No admin users found in user_roles table'
+      })
 
       // Get my assignments for current period
       const { data: myAssignments, error: assignmentsError } = await supabase
@@ -84,12 +111,19 @@ export class DashboardService {
         return this.getDefaultStats()
       }
 
-      const completedAssessments = myAssignments?.filter(a => a.is_completed).length || 0
-      const pendingAssessments = myAssignments?.filter(a => !a.is_completed).length || 0
+      // Filter out assignments to admin users to get valid assignments for progress calculation
+      const validAssignments = myAssignments?.filter(assignment => 
+        !adminUserIds.includes(assignment.assessee_id)
+      ) || []
+
+      const completedAssessments = validAssignments.filter(a => a.is_completed).length || 0
+      // Pending = Total employees that can be assessed - completed assessments
+      const pendingAssessments = totalEmployees - completedAssessments
       
-      // Calculate progress based on actual assignments, not total employees
-      const totalAssignments = myAssignments?.length || 0
-      const myProgress = totalAssignments > 0 ? Math.round((completedAssessments / totalAssignments) * 100) : 0
+      // Calculate progress based on total employees that can be assessed (excluding admin and self)
+      // NOT based on assignments given to this supervisor
+      const totalAssignments = totalEmployees // Total employees that can be assessed
+      const myProgress = totalEmployees > 0 ? Math.round((completedAssessments / totalEmployees) * 100) : 0
 
       // Debug logging for progress calculation
       console.log('Progress Calculation Debug:', {
@@ -99,7 +133,20 @@ export class DashboardService {
         pendingAssessments,
         myProgress,
         userId,
-        periodId: currentPeriod.id
+        periodId: currentPeriod.id,
+        calculation: `${completedAssessments} / ${totalEmployees} * 100 = ${myProgress}%`,
+        explanation: `Total Assignment = Total Employees (${totalEmployees}), bukan jumlah assignment yang diberikan (${validAssignments.length})`,
+        allAssignments: myAssignments?.map(a => ({
+          id: a.id,
+          assessee: a.assessee?.full_name,
+          is_completed: a.is_completed,
+          isAdmin: adminUserIds.includes(a.assessee_id)
+        })),
+        validAssignments: validAssignments.map(a => ({
+          id: a.id,
+          assessee: a.assessee?.full_name,
+          is_completed: a.is_completed
+        }))
       })
 
       // Get my average rating from feedback received
@@ -135,7 +182,7 @@ export class DashboardService {
         currentPeriod: currentPeriodText,
         myProgress,
         averageRating,
-        myAssignments: myAssignments || [],
+        myAssignments: validAssignments,
         currentPeriodData: currentPeriod
       }
     } catch (error) {

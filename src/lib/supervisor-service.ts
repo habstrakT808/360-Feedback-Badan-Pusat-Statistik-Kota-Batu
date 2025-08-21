@@ -1,5 +1,6 @@
 // src/lib/supervisor-service.ts (REPLACE METHOD getAllUsersWithResults - DATABASE VERSION)
 import { supabase } from '@/lib/supabase'
+import { RolesService } from '@/lib/roles-service'
 import { Database } from '@/lib/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -24,35 +25,11 @@ export class SupervisorService {
 
       console.log('📋 Total profiles found:', profiles?.length || 0)
 
-      // Step 2: Get restricted users with simple query (no joins)
-      const { data: restrictedUsers, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('role', ['admin', 'supervisor'])
-
-      if (rolesError) {
-        console.error('❌ Error fetching restricted roles:', rolesError)
-        // If we can't get roles, return empty array for safety
-        return []
-      }
-
-      console.log('🚫 Restricted users from DB:', restrictedUsers)
-      console.log('🚫 Restricted users count:', restrictedUsers?.length || 0)
-
-      const restrictedUserIds = restrictedUsers?.map(u => u.user_id) || []
+      // Step 2: Get restricted users using roles service (with env overrides)
+      const { adminIds, supervisorIds } = await RolesService.getRoleUserIds()
+      const allRestrictedIds = [...new Set([...adminIds, ...supervisorIds])]
       
-      // MANUAL FIX: Add known admin/supervisor IDs that might be missing from query
-      const knownRestrictedIds = [
-        'dccdb786-d7e7-44a8-a4d0-e446623c19b9', // Hafiyan (admin)
-        '678ad9e9-cc08-4101-b735-6d2e1feaab3a'  // Herlina (supervisor)
-      ]
-      
-      // Combine and deduplicate
-      const allRestrictedIds = [...new Set([...restrictedUserIds, ...knownRestrictedIds])]
-      
-      console.log('🚫 Original restricted user IDs:', restrictedUserIds)
-      console.log('🚫 Manual restricted user IDs:', knownRestrictedIds)
-      console.log('🚫 Combined restricted user IDs:', allRestrictedIds)
+      console.log('🚫 Restricted user IDs:', allRestrictedIds)
 
       // Step 3: Filter out restricted users
       const assessableUsers = profiles?.filter(profile => {
@@ -253,17 +230,20 @@ export class SupervisorService {
             full_name: assessee.full_name,
             email: assessee.email,
             position: assessee.position,
-            department: assessee.department
+            department: assessee.department,
+            avatar_url: assessee.avatar_url
           },
           supervisorRatings: [],
           peerRatings: [],
           allFeedback: [],
+          allAssessors: new Set<string>(), // Track unique assessors
           aspectResults: new Map()
         })
       }
 
       const userData = userResultsMap.get(assesseeId)
       userData.allFeedback.push(feedback)
+      userData.allAssessors.add(assessorId) // Add assessor to the set
 
       // Determine if this is supervisor assessment
       const isSupervisorAssessment = supervisorIds.includes(assessorId)
@@ -283,17 +263,37 @@ export class SupervisorService {
         userData.aspectResults.set(aspect, {
           supervisorRatings: [],
           peerRatings: [],
-          allRatings: []
+          allRatings: [],
+          allAssessors: new Set(), // Track unique assessors for this aspect
+          supervisorComments: new Map(), // Track supervisor comments by assessor ID
+          peerComments: new Map() // Track peer comments by assessor ID
         })
       }
 
       const aspectData = userData.aspectResults.get(aspect)
       aspectData.allRatings.push(feedback.rating)
+      aspectData.allAssessors.add(assessorId) // Add assessor to the set
 
       if (isSupervisorAssessment) {
         aspectData.supervisorRatings.push(feedback.rating)
+        // Add supervisor comment if available, only once per assessor per aspect
+        if (feedback.comment && !aspectData.supervisorComments.has(assessorId)) {
+          aspectData.supervisorComments.set(assessorId, {
+            comment: feedback.comment,
+            assessor: assessor.full_name,
+            rating: feedback.rating
+          })
+        }
       } else {
         aspectData.peerRatings.push(feedback.rating)
+        // Add peer comment if available, only once per assessor per aspect
+        if (feedback.comment && !aspectData.peerComments.has(assessorId)) {
+          aspectData.peerComments.set(assessorId, {
+            comment: feedback.comment,
+            assessor: assessor.full_name,
+            rating: feedback.rating
+          })
+        }
       }
     })
 
@@ -354,7 +354,11 @@ export class SupervisorService {
           supervisorAverage: supervisorAspectAvg,
           peerAverage: peerAspectAvg,
           finalScore: aspectFinalScore,
-          totalFeedback: data.allRatings.length
+          // Count unique assessors who gave feedback for this aspect (not per indicator)
+          totalFeedback: (data.allAssessors as Set<string>).size,
+          // Include comments for dropdown display
+          supervisorComments: Array.from(data.supervisorComments.values()),
+          peerComments: Array.from(data.peerComments.values())
         }
       })
 
@@ -363,7 +367,8 @@ export class SupervisorService {
         supervisorAverage: supervisorAvg,
         peerAverage: peerAvg,
         finalScore,
-        totalFeedback: userData.allFeedback.length,
+        // Count unique assessors who gave feedback (not per indicator)
+        totalFeedback: (userData.allAssessors as Set<string>).size,
         aspectResults: processedAspects,
         hasSupervisorAssessment: userData.supervisorRatings.length > 0,
         hasPeerAssessment: userData.peerRatings.length > 0

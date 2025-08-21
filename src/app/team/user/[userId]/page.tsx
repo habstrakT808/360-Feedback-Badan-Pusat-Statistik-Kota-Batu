@@ -1,7 +1,7 @@
 // src/app/team/user/[userId]/page.tsx (NEW FILE)
 "use client";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, Fragment } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import { useUserRole } from "@/hooks/useUserRole";
 import { SupervisorService } from "@/lib/supervisor-service";
@@ -19,6 +19,8 @@ import {
   Users,
   MessageSquare,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export default function UserDetailPage() {
@@ -29,12 +31,20 @@ export default function UserDetailPage() {
 
   const [userDetail, setUserDetail] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (userId) {
       loadUserDetail();
     }
   }, [userId]);
+
+  const toggleAspect = (aspect: string) => {
+    setExpanded((prev) => ({
+      ...prev,
+      [aspect]: !prev[aspect],
+    }));
+  };
 
   const loadUserDetail = async () => {
     try {
@@ -158,11 +168,19 @@ export default function UserDetailPage() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-3xl">
-                  {userDetail.user.full_name?.charAt(0) ||
-                    userDetail.user.email?.charAt(0)}
-                </span>
+              <div className="w-20 h-20 rounded-full overflow-hidden bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center">
+                {userDetail.user.avatar_url ? (
+                  <img
+                    src={userDetail.user.avatar_url}
+                    alt={userDetail.user.full_name || userDetail.user.email}
+                    className="w-20 h-20 object-cover"
+                  />
+                ) : (
+                  <span className="text-white font-bold text-3xl">
+                    {userDetail.user.full_name?.charAt(0) ||
+                      userDetail.user.email?.charAt(0)}
+                  </span>
+                )}
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -384,61 +402,161 @@ export default function UserDetailPage() {
                     <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
                       Total Feedback
                     </th>
+                    <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
+                      Komentar
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {userDetail.aspectResults.map(
                     (aspect: any, index: number) => (
-                      <motion.tr
-                        key={aspect.aspect}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.5 + index * 0.05 }}
-                        className="hover:bg-gray-50 transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {getAspectName(aspect.aspect)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRatingBg(
-                              aspect.supervisorAverage
-                            )} ${getRatingColor(aspect.supervisorAverage)}`}
-                          >
-                            {aspect.supervisorAverage
-                              ? aspect.supervisorAverage.toFixed(1)
-                              : "N/A"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRatingBg(
-                              aspect.peerAverage
-                            )} ${getRatingColor(aspect.peerAverage)}`}
-                          >
-                            {aspect.peerAverage
-                              ? aspect.peerAverage.toFixed(1)
-                              : "N/A"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRatingBg(
-                              aspect.finalScore
-                            )} ${getRatingColor(aspect.finalScore)}`}
-                          >
-                            <Star className="w-4 h-4 mr-1" />
-                            {aspect.finalScore
-                              ? aspect.finalScore.toFixed(1)
-                              : "N/A"}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center text-sm text-gray-900">
-                          {aspect.totalFeedback}
-                        </td>
-                      </motion.tr>
+                      <Fragment key={aspect.aspect}>
+                        <motion.tr
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.5 + index * 0.05 }}
+                          className="hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {getAspectName(aspect.aspect)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRatingBg(
+                                aspect.supervisorAverage
+                              )} ${getRatingColor(aspect.supervisorAverage)}`}
+                            >
+                              {aspect.supervisorAverage
+                                ? aspect.supervisorAverage.toFixed(1)
+                                : "N/A"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRatingBg(
+                                aspect.peerAverage
+                              )} ${getRatingColor(aspect.peerAverage)}`}
+                            >
+                              {aspect.peerAverage
+                                ? aspect.peerAverage.toFixed(1)
+                                : "N/A"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRatingBg(
+                                aspect.finalScore
+                              )} ${getRatingColor(aspect.finalScore)}`}
+                            >
+                              <Star className="w-4 h-4 mr-1" />
+                              {aspect.finalScore
+                                ? aspect.finalScore.toFixed(1)
+                                : "N/A"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center text-sm text-gray-900">
+                            {aspect.totalFeedback}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              onClick={() => toggleAspect(aspect.aspect)}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                              {expanded[aspect.aspect] ? (
+                                <ChevronUp className="w-5 h-5 text-gray-600" />
+                              ) : (
+                                <ChevronDown className="w-5 h-5 text-gray-600" />
+                              )}
+                            </button>
+                          </td>
+                        </motion.tr>
+                        <AnimatePresence>
+                          {expanded[aspect.aspect] && (
+                            <motion.tr
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={{ delay: 0.1 }}
+                              className="bg-gray-50"
+                            >
+                              <td colSpan={6} className="px-6 py-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <h4 className="text-lg font-semibold mb-2 text-gray-900">
+                                      Feedback Supervisor
+                                    </h4>
+                                    {aspect.supervisorComments &&
+                                    aspect.supervisorComments.length > 0 ? (
+                                      <div className="space-y-2">
+                                        {aspect.supervisorComments.map(
+                                          (comment: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className="bg-white p-3 rounded-lg border border-gray-200"
+                                            >
+                                              <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm font-medium text-gray-700">
+                                                  {comment.assessor}
+                                                </span>
+                                                <span className="text-sm text-gray-500">
+                                                  Skor: {comment.rating}
+                                                </span>
+                                              </div>
+                                              <p className="text-gray-800 text-sm">
+                                                {comment.comment}
+                                              </p>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p className="text-gray-500 italic">
+                                        Tidak ada feedback supervisor
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <h4 className="text-lg font-semibold mb-2 text-gray-900">
+                                      Feedback Rekan Kerja
+                                    </h4>
+                                    {aspect.peerComments &&
+                                    aspect.peerComments.length > 0 ? (
+                                      <div className="space-y-2">
+                                        {aspect.peerComments.map(
+                                          (comment: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className="bg-white p-3 rounded-lg border border-gray-200"
+                                            >
+                                              <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm font-medium text-gray-700">
+                                                  {comment.assessor}
+                                                </span>
+                                                <span className="text-sm text-gray-500">
+                                                  Skor: {comment.rating}
+                                                </span>
+                                              </div>
+                                              <p className="text-gray-800 text-sm">
+                                                {comment.comment}
+                                              </p>
+                                            </div>
+                                          )
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p className="text-gray-500 italic">
+                                        Tidak ada feedback rekan kerja
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </motion.tr>
+                          )}
+                        </AnimatePresence>
+                      </Fragment>
                     )
                   )}
                 </tbody>
