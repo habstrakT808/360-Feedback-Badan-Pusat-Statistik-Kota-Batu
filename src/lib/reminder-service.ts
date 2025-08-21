@@ -127,7 +127,15 @@ export class ReminderService {
         .from('assessment_assignments')
         .select(`
           *,
-          period:assessment_periods(*),
+                      period:assessment_periods(
+              id,
+              month,
+              year,
+              is_active,
+              start_date,
+              end_date,
+              created_at
+            ),
           assessor:profiles!assessment_assignments_assessor_id_fkey(*),
           assessee:profiles!assessment_assignments_assessee_id_fkey(*)
         `)

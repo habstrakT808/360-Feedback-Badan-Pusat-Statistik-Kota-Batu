@@ -7,14 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { SettingsService } from "@/lib/settings-service";
 import { useStore } from "@/store/useStore";
-import {
-  User,
-  Mail,
-  Briefcase,
-  Camera,
-  Save,
-  Upload,
-} from "lucide-react";
+import { User, Mail, Briefcase, Camera, Save, Upload } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 const profileSchema = z.object({
@@ -101,10 +94,8 @@ export function ProfileSettings({ profile, onUpdate }: ProfileSettingsProps) {
 
     setAvatarLoading(true);
     try {
-      // Note: Avatar upload functionality would be implemented here
-      // For now, we'll just simulate the upload
-      const avatarUrl = URL.createObjectURL(file);
-      onUpdate({ ...profile, avatar_url: avatarUrl });
+      const updated = await SettingsService.uploadAvatar(user.id, file);
+      onUpdate(updated);
       toast.success("Avatar berhasil diperbarui");
     } catch (error: any) {
       toast.error(error.message || "Gagal mengupload avatar");
@@ -271,7 +262,11 @@ export function ProfileSettings({ profile, onUpdate }: ProfileSettingsProps) {
               Departemen
             </label>
             <div className="relative">
-              <img src="/logo-bps.png" alt="BPS" className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 object-contain" />
+              <img
+                src="/logo-bps.png"
+                alt="BPS"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 object-contain"
+              />
               <input
                 {...register("department")}
                 type="text"

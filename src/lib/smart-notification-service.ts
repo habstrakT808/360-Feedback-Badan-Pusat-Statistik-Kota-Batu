@@ -1,4 +1,4 @@
-// src/lib/smart-notification-service.ts - FIXED VERSION
+// src/lib/smart-notification-service-improved.ts
 import { supabase } from './supabase'
 import { NotificationService } from './notification-service'
 
@@ -9,11 +9,18 @@ interface UserData {
   department: string | null
 }
 
-export class SmartNotificationService {
-  // Generate simple notifications for all users
+export class SmartNotificationServiceImproved {
+  private static readonly DUPLICATE_CHECK_HOURS = 6
+  private static readonly BATCH_SIZE = 3
+  private static readonly DELAY_BETWEEN_USERS = 500
+
+  // Generate notifications with better duplicate prevention
   static async generateSimpleNotifications(): Promise<void> {
     try {
-      console.log('🚀 Starting simple notification generation...')
+      console.log('🚀 Starting improved notification generation...')
+      
+      // First, cleanup any recent duplicates
+      await this.cleanupRecentDuplicatesSimple()
       
       const { data: users, error: usersError } = await supabase
         .from('profiles')
@@ -27,86 +34,130 @@ export class SmartNotificationService {
 
       console.log(`📧 Processing ${users.length} users...`)
 
+      // Process users one by one with delay to prevent race conditions
       for (const user of users) {
-        await this.generateUserSimpleNotifications(user)
-        await new Promise(resolve => setTimeout(resolve, 300))
+        try {
+          await this.generateUserNotificationsImproved(user)
+          await new Promise(resolve => setTimeout(resolve, this.DELAY_BETWEEN_USERS))
+        } catch (error) {
+          console.error(`Failed for user ${user.full_name}:`, error)
+          // Continue with next user
+        }
       }
 
-      console.log('🎉 Simple notification generation completed!')
+      console.log('🎉 Improved notification generation completed!')
     } catch (error) {
       console.error('❌ Failed to generate notifications:', error)
     }
   }
 
-  // Generate notifications for specific user - FIXED
-  static async generateUserSimpleNotifications(user: UserData): Promise<void> {
+  // Improved notification generation with better duplicate checking
+  private static async generateUserNotificationsImproved(user: UserData): Promise<void> {
     try {
       console.log(`📝 Processing: ${user.full_name}`)
       
       const firstName = user.full_name.split(' ')[0]
+      const checkTime = new Date(Date.now() - this.DUPLICATE_CHECK_HOURS * 60 * 60 * 1000).toISOString()
 
-      // Check existing notifications for this user (last 24 hours to prevent duplicates)
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      // Get existing notifications with more specific checking
       const { data: existingNotifications } = await supabase
         .from('notifications')
-        .select('title, type, created_at')
+        .select('title, type, created_at, message')
         .eq('user_id', user.id)
         .eq('type', 'system')
-        .gte('created_at', oneDayAgo)
+        .gte('created_at', checkTime)
+        .order('created_at', { ascending: false })
 
-      const existingTitles = new Set(
-        existingNotifications?.map(n => n.title.toLowerCase()) || []
+      // Create a more specific key for duplicate detection
+      const existingKeys = new Set(
+        (existingNotifications || []).map(n => 
+          this.createNotificationKey(n.title, n.message)
+        )
       )
 
-      console.log(`Existing notifications for ${firstName} (last 24h):`, existingTitles.size)
+      console.log(`${firstName} has ${existingKeys.size} recent notifications`)
 
-      // 1. Welcome notification (only if not exists)
+      const notificationsToCreate: any[] = []
+
+      // 1. Welcome notification
       const welcomeTitle = `👋 Selamat datang, ${firstName}!`
-      if (!existingTitles.has(welcomeTitle.toLowerCase())) {
-        console.log(`Creating welcome for ${firstName}`)
-        await NotificationService.sendSystemNotification(
-          [user.id],
-          welcomeTitle,
-          `Selamat datang di sistem penilaian 360° BPS Kota Batu! Mari bersama-sama membangun budaya feedback yang konstruktif untuk pengembangan organisasi.`,
-          '/dashboard',
-          'low'
-        )
-        await new Promise(resolve => setTimeout(resolve, 300))
-      } else {
-        console.log(`Welcome already exists for ${firstName}`)
+      const welcomeMessage = `Selamat datang di sistem penilaian 360° BPS Kota Batu! Mari bersama-sama membangun budaya feedback yang konstruktif untuk pengembangan organisasi.`
+      const welcomeKey = this.createNotificationKey(welcomeTitle, welcomeMessage)
+      
+      if (!existingKeys.has(welcomeKey)) {
+        notificationsToCreate.push({
+          user_id: user.id,
+          title: welcomeTitle,
+          message: welcomeMessage,
+          type: 'system',
+          priority: 'low',
+          action_url: '/dashboard',
+          metadata: { 
+            notification_type: 'welcome',
+            generated_at: new Date().toISOString(),
+            user_name: firstName
+          }
+        })
       }
 
-      // 2. Assignment notification (if has assignments)
-      await this.createAssignmentNotificationIfNeeded(user, firstName, existingTitles)
+      // 2. Assignment notification
+      const assignmentNotification = await this.createAssignmentNotificationData(user, firstName)
+      if (assignmentNotification) {
+        const assignmentKey = this.createNotificationKey(assignmentNotification.title, assignmentNotification.message)
+        if (!existingKeys.has(assignmentKey)) {
+          notificationsToCreate.push(assignmentNotification)
+        }
+      }
 
-      // 3. Tips notification (only if not exists)
+      // 3. Tips notification
       const tipsTitle = `💡 Tips: Memberikan Feedback yang Efektif`
-      if (!existingTitles.has(tipsTitle.toLowerCase())) {
-        console.log(`Creating tips for ${firstName}`)
-        await NotificationService.sendSystemNotification(
-          [user.id],
-          tipsTitle,
-          `${firstName}, berikan feedback yang spesifik, konstruktif, dan actionable. Fokus pada perilaku dan dampaknya, bukan pada kepribadian. Berikan contoh konkret dan saran perbaikan yang dapat ditindaklanjuti.`,
-          '/dashboard',
-          'low'
-        )
-        await new Promise(resolve => setTimeout(resolve, 300))
+      const tipsMessage = `${firstName}, berikan feedback yang spesifik, konstruktif, dan actionable. Fokus pada perilaku dan dampaknya, bukan pada kepribadian. Berikan contoh konkret dan saran perbaikan yang dapat ditindaklanjuti.`
+      const tipsKey = this.createNotificationKey(tipsTitle, tipsMessage)
+      
+      if (!existingKeys.has(tipsKey)) {
+        notificationsToCreate.push({
+          user_id: user.id,
+          title: tipsTitle,
+          message: tipsMessage,
+          type: 'system',
+          priority: 'low',
+          action_url: '/dashboard',
+          metadata: { 
+            notification_type: 'tips',
+            generated_at: new Date().toISOString(),
+            user_name: firstName
+          }
+        })
+      }
+
+      // Create notifications if any (one by one to prevent race conditions)
+      if (notificationsToCreate.length > 0) {
+        console.log(`Creating ${notificationsToCreate.length} notifications for ${firstName}`)
+        
+        for (const notification of notificationsToCreate) {
+          try {
+            await NotificationService.createNotification(notification)
+            await new Promise(resolve => setTimeout(resolve, 100)) // Small delay between notifications
+          } catch (error) {
+            console.error(`Failed to create notification for ${firstName}:`, error)
+          }
+        }
       } else {
-        console.log(`Tips already exists for ${firstName}`)
+        console.log(`No new notifications needed for ${firstName}`)
       }
 
       console.log(`✅ Completed: ${user.full_name}`)
     } catch (error) {
       console.error(`❌ Failed for ${user.full_name}:`, error)
+      throw error
     }
   }
 
-  // Create assignment notification if needed
-  private static async createAssignmentNotificationIfNeeded(
+  // Create assignment notification data
+  private static async createAssignmentNotificationData(
     user: UserData, 
-    firstName: string, 
-    existingTitles: Set<string>
-  ): Promise<void> {
+    firstName: string
+  ): Promise<any | null> {
     try {
       // Get current active period
       const { data: period } = await supabase
@@ -115,10 +166,7 @@ export class SmartNotificationService {
         .eq('is_active', true)
         .single()
 
-      if (!period) {
-        console.log(`No active period for ${firstName}`)
-        return
-      }
+      if (!period) return null
 
       // Get user assignments
       const { data: assignments } = await supabase
@@ -134,21 +182,7 @@ export class SmartNotificationService {
       const pendingAssignments = assignmentList.filter(a => !a.is_completed)
       const pendingCount = pendingAssignments.length
 
-      if (pendingCount === 0) {
-        console.log(`No pending assignments for ${firstName}`)
-        return
-      }
-
-      // Check if assignment notification already exists
-      const assignmentTitlePattern = `📋 ${pendingCount} penilaian menunggu`
-      const hasAssignmentNotification = Array.from(existingTitles).some(title => 
-        title.includes('📋') && title.includes('penilaian menunggu')
-      )
-
-      if (hasAssignmentNotification) {
-        console.log(`Assignment notification already exists for ${firstName}`)
-        return
-      }
+      if (pendingCount === 0) return null
 
       // Calculate days left
       const daysLeft = Math.ceil(
@@ -164,36 +198,119 @@ export class SmartNotificationService {
       const remainingText = pendingCount > 3 ? ` dan ${pendingCount - 3} lainnya` : ''
       const priority = pendingCount >= 5 ? 'high' : pendingCount >= 3 ? 'medium' : 'low'
 
-      console.log(`Creating assignment notification for ${firstName}`)
-      await NotificationService.sendSystemNotification(
-        [user.id],
-        `📋 ${pendingCount} Penilaian Menunggu`,
-        `${firstName}, Anda memiliki ${pendingCount} rekan kerja yang menunggu penilaian: ${assigneeNames}${remainingText}. Periode berakhir dalam ${daysLeft} hari lagi.`,
-        '/assessment',
-        priority
-      )
-
+      return {
+        user_id: user.id,
+        title: `📋 ${pendingCount} Penilaian Menunggu`,
+        message: `${firstName}, Anda memiliki ${pendingCount} rekan kerja yang menunggu penilaian: ${assigneeNames}${remainingText}. Periode berakhir dalam ${daysLeft} hari lagi.`,
+        type: 'system',
+        priority: priority,
+        action_url: '/assessment',
+        metadata: {
+          notification_type: 'assignment',
+          pending_count: pendingCount,
+          days_left: daysLeft,
+          period_id: period.id,
+          generated_at: new Date().toISOString(),
+          user_name: firstName
+        }
+      }
     } catch (error) {
       console.error(`Failed to create assignment notification for ${firstName}:`, error)
+      return null
     }
   }
 
-  // Public method for single user - FIXED
+  // Create unique key for notification
+  private static createNotificationKey(title: string, message: string): string {
+    // Remove dynamic parts like names and numbers for better duplicate detection
+    const normalizedTitle = title
+      .replace(/\d+/g, 'N') // Replace numbers with N
+      .replace(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g, 'NAME') // Replace names
+      .toLowerCase()
+      .trim()
+    
+    const normalizedMessage = message
+      .substring(0, 100) // Only check first 100 chars
+      .replace(/\d+/g, 'N')
+      .replace(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g, 'NAME')
+      .toLowerCase()
+      .trim()
+    
+    return `${normalizedTitle}|${normalizedMessage}`
+  }
+
+  // Clean up recent duplicates - simplified version
+  private static async cleanupRecentDuplicatesSimple(): Promise<void> {
+    try {
+      console.log('🧹 Cleaning up recent duplicates...')
+      
+      // Get duplicates from last 24 hours
+      const { data: duplicates } = await supabase
+        .from('notifications')
+        .select('user_id, title, created_at, id')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+
+      if (!duplicates || duplicates.length === 0) return
+
+      // Group by user_id + title to find duplicates
+      const groupedNotifications = new Map<string, any[]>()
+      
+      duplicates.forEach(notification => {
+        const key = `${notification.user_id}|${notification.title}`
+        if (!groupedNotifications.has(key)) {
+          groupedNotifications.set(key, [])
+        }
+        groupedNotifications.get(key)!.push(notification)
+      })
+
+      const idsToDelete: string[] = []
+      
+      // For each group, keep the oldest and mark others for deletion
+      groupedNotifications.forEach(notifications => {
+        if (notifications.length > 1) {
+          // Sort by created_at and keep the first (oldest)
+          notifications.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          // Add all but the first to deletion list
+          idsToDelete.push(...notifications.slice(1).map(n => n.id))
+        }
+      })
+
+      if (idsToDelete.length > 0) {
+        // Delete in batches to avoid timeout
+        const batchSize = 50
+        for (let i = 0; i < idsToDelete.length; i += batchSize) {
+          const batch = idsToDelete.slice(i, i + batchSize)
+          await supabase
+            .from('notifications')
+            .delete()
+            .in('id', batch)
+          
+          console.log(`Deleted batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(idsToDelete.length/batchSize)}`)
+        }
+
+        console.log(`✅ Removed ${idsToDelete.length} duplicate notifications`)
+      }
+    } catch (error) {
+      console.error('Failed to cleanup duplicates:', error)
+    }
+  }
+
+  // Public method for single user
   static async generateForUser(userId: string): Promise<void> {
     try {
-      // Check if notifications were generated recently (within last 6 hours)
-      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+      // Check recent generation
+      const recentCheck = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() // 2 hours
       
       const { data: recentNotifications } = await supabase
         .from('notifications')
         .select('id')
         .eq('user_id', userId)
         .eq('type', 'system')
-        .gte('created_at', sixHoursAgo)
-        .limit(5)
+        .gte('created_at', recentCheck)
 
       if (recentNotifications && recentNotifications.length >= 3) {
-        console.log(`User ${userId} already has ${recentNotifications.length} recent notifications, skipping...`)
+        console.log(`User ${userId} already has recent notifications, skipping...`)
         return
       }
 
@@ -204,14 +321,38 @@ export class SmartNotificationService {
         .single()
 
       if (user) {
-        await this.generateUserSimpleNotifications(user)
+        await this.generateUserNotificationsImproved(user)
       }
     } catch (error) {
       console.error('Failed to generate notifications for user:', error)
     }
   }
 
-  // Daily reminder - SIMPLIFIED
+  // Remove all duplicates
+  static async removeDuplicates(): Promise<void> {
+    try {
+      console.log('🧹 Removing all duplicate notifications...')
+      
+      // Remove old notifications first (30+ days)
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      await supabase
+        .from('notifications')
+        .delete()
+        .eq('is_read', true)
+        .lt('created_at', thirtyDaysAgo.toISOString())
+
+      // Clean up recent duplicates
+      await this.cleanupRecentDuplicatesSimple()
+
+      console.log('✅ Duplicate cleanup completed')
+    } catch (error) {
+      console.error('Failed to remove duplicates:', error)
+    }
+  }
+
+  // Daily reminder - simplified
   static async sendDailyReminders(): Promise<void> {
     try {
       console.log('🔔 Sending daily reminders...')
@@ -287,71 +428,24 @@ export class SmartNotificationService {
           prefix = `Deadline ${daysLeft} Hari Lagi`
         }
 
-        await NotificationService.sendSystemNotification(
-          [userId],
-          `${emoji} ${prefix}: ${userData.count} Penilaian`,
-          `${firstName}, pengingat: Anda masih memiliki ${userData.count} penilaian yang belum diselesaikan. Deadline dalam ${daysLeft} hari lagi. Jangan sampai terlewat!`,
-          '/assessment',
-          urgency
-        )
+        try {
+          await NotificationService.sendSystemNotification(
+            [userId],
+            `${emoji} ${prefix}: ${userData.count} Penilaian`,
+            `${firstName}, pengingat: Anda masih memiliki ${userData.count} penilaian yang belum diselesaikan. Deadline dalam ${daysLeft} hari lagi. Jangan sampai terlewat!`,
+            '/assessment',
+            urgency
+          )
 
-        await new Promise(resolve => setTimeout(resolve, 200))
+          await new Promise(resolve => setTimeout(resolve, 200))
+        } catch (error) {
+          console.error(`Failed to send reminder to ${firstName}:`, error)
+        }
       }
 
       console.log(`✅ Daily reminders sent to ${userCounts.size} users`)
     } catch (error) {
       console.error('❌ Failed to send daily reminders:', error)
-    }
-  }
-
-  // Remove duplicates
-  static async removeDuplicates(): Promise<void> {
-    try {
-      console.log('🧹 Removing duplicate notifications...')
-      
-      // First, remove old notifications (older than 30 days)
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-      await supabase
-        .from('notifications')
-        .delete()
-        .lt('created_at', thirtyDaysAgo.toISOString())
-
-      // Then, remove recent duplicates (keep only the latest one for each user-title combination)
-      const { data: duplicates } = await supabase
-        .from('notifications')
-        .select('user_id, title, created_at, id')
-        .eq('type', 'system')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false })
-
-      if (duplicates) {
-        const seen = new Set<string>()
-        const toDelete: string[] = []
-
-        duplicates.forEach(notification => {
-          const key = `${notification.user_id}-${notification.title.toLowerCase()}`
-          if (seen.has(key)) {
-            toDelete.push(notification.id)
-          } else {
-            seen.add(key)
-          }
-        })
-
-        if (toDelete.length > 0) {
-          await supabase
-            .from('notifications')
-            .delete()
-            .in('id', toDelete)
-
-          console.log(`✅ Removed ${toDelete.length} duplicate notifications`)
-        }
-      }
-
-      console.log('✅ Duplicate cleanup completed')
-    } catch (error) {
-      console.error('Failed to remove duplicates:', error)
     }
   }
 }

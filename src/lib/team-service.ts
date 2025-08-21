@@ -35,7 +35,15 @@ export class TeamService {
         *,
         assignment:assessment_assignments!inner(
           assessee_id,
-          period:assessment_periods(*),
+          period:assessment_periods(
+            id,
+            month,
+            year,
+            is_active,
+            start_date,
+            end_date,
+            created_at
+          ),
           assessee:profiles!assessment_assignments_assessee_id_fkey(*)
         )
       `)
@@ -134,7 +142,15 @@ export class TeamService {
       .from('assessment_assignments')
       .select(`
         *,
-        period:assessment_periods(*),
+        period:assessment_periods(
+          id,
+          month,
+          year,
+          is_active,
+          start_date,
+          end_date,
+          created_at
+        ),
         assessor:profiles!assessment_assignments_assessor_id_fkey(*),
         assessee:profiles!assessment_assignments_assessee_id_fkey(*)
       `)

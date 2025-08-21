@@ -250,12 +250,12 @@ export function NotificationBell() {
               initial={{ opacity: 0, scale: 0.9, y: -10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: -10 }}
-              className="absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 max-h-[80vh] flex flex-col"
+              className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 max-h-[70vh] sm:max-h-[80vh] flex flex-col transform -translate-x-1/2 sm:translate-x-0 left-1/2 sm:left-auto sm:right-0"
             >
               {/* Header */}
-              <div className="p-4 border-b border-gray-200">
+              <div className="p-3 sm:p-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                     Notifications
                   </h3>
                   <div className="flex items-center space-x-2">
@@ -264,7 +264,7 @@ export function NotificationBell() {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleMarkAllAsRead}
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm font-medium"
                       >
                         Mark all read
                       </motion.button>
@@ -278,7 +278,7 @@ export function NotificationBell() {
                   </div>
                 </div>
                 {unreadCount > 0 && (
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1">
                     {unreadCount} unread notification
                     {unreadCount > 1 ? "s" : ""}
                   </p>
@@ -288,19 +288,21 @@ export function NotificationBell() {
               {/* Notifications List */}
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {isLoading ? (
-                  <div className="p-8 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-gray-600 mt-2">
+                  <div className="p-6 sm:p-8 text-center">
+                    <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-xs sm:text-sm text-gray-600 mt-2">
                       Loading notifications...
                     </p>
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-1">
+                  <div className="p-6 sm:p-8 text-center">
+                    <Bell className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3" />
+                    <h4 className="text-base sm:text-lg font-medium text-gray-900 mb-1">
                       No notifications
                     </h4>
-                    <p className="text-gray-600">You're all caught up! 🎉</p>
+                    <p className="text-xs sm:text-sm text-gray-600">
+                      You're all caught up! 🎉
+                    </p>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
@@ -310,13 +312,13 @@ export function NotificationBell() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className={`p-4 hover:bg-gray-50 transition-colors border-l-4 ${getPriorityColor(
-                          notification.priority
-                        )} ${!notification.is_read ? "bg-blue-50/30" : ""}`}
+                        className={`p-3 sm:p-4 hover:bg-gray-50 transition-colors ${
+                          !notification.is_read ? "bg-blue-50/30" : ""
+                        }`}
                       >
-                        <div className="flex items-start space-x-3">
+                        <div className="flex items-start space-x-2 sm:space-x-3">
                           <div
-                            className={`p-2 rounded-lg ${
+                            className={`p-1.5 sm:p-2 rounded-lg ${
                               getNotificationColor(notification.type).bg
                             } flex-shrink-0`}
                           >
@@ -329,11 +331,11 @@ export function NotificationBell() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between">
                               <h4
-                                className={`text-sm font-medium ${
+                                className={`text-xs sm:text-sm font-medium ${
                                   !notification.is_read
                                     ? "text-gray-900"
                                     : "text-gray-700"
-                                }`}
+                                } leading-tight`}
                               >
                                 {notification.title}
                               </h4>
@@ -365,11 +367,11 @@ export function NotificationBell() {
                               </div>
                             </div>
 
-                            <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                            <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
                               {notification.message}
                             </p>
 
-                            <div className="flex items-center justify-between mt-3">
+                            <div className="flex items-center justify-between mt-2 sm:mt-3">
                               <span className="text-xs text-gray-500">
                                 {formatDistanceToNow(
                                   new Date(notification.created_at),
@@ -390,7 +392,7 @@ export function NotificationBell() {
                                         notification.action_url;
                                       setIsOpen(false);
                                     }}
-                                    className="text-xs bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700 transition-colors"
+                                    className="text-xs bg-blue-600 text-white px-2 sm:px-3 py-1 rounded-full hover:bg-blue-700 transition-colors"
                                   >
                                     {notification.action_label}
                                   </motion.button>
@@ -406,7 +408,7 @@ export function NotificationBell() {
 
               {/* Footer */}
               {notifications.length > 0 && (
-                <div className="p-4 border-t border-gray-200">
+                <div className="p-3 sm:p-4 border-t border-gray-200">
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -414,7 +416,7 @@ export function NotificationBell() {
                       window.location.href = "/notifications";
                       setIsOpen(false);
                     }}
-                    className="w-full text-center text-blue-600 hover:text-blue-700 font-medium text-sm py-2 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="w-full text-center text-blue-600 hover:text-blue-700 font-medium text-xs sm:text-sm py-2 hover:bg-blue-50 rounded-lg transition-colors"
                   >
                     View All Notifications
                   </motion.button>

@@ -1,13 +1,14 @@
-// src/app/my-results/page.tsx
+// src/app/my-results/page.tsx (REPLACE COMPLETE FILE)
 "use client";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useState, useEffect, Fragment } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useStore } from "@/store/useStore";
+import { ResultsService } from "@/lib/results-service";
 import { AspectCard } from "@/components/results/AspectCard";
 import { Loading } from "@/components/ui/Loading";
-import { ResultsService } from "@/lib/results-service";
-import { useStore } from "@/store/useStore";
 import { toast } from "react-hot-toast";
+import { ASSESSMENT_ASPECTS } from "@/lib/assessment-data";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Trophy,
   AlertCircle,
@@ -15,9 +16,12 @@ import {
   Users,
   Calendar,
   TrendingUp,
+  Star,
+  UserCheck,
 } from "lucide-react";
 
-const ASPECT_NAMES = {
+// Aspect names mapping
+const ASPECT_NAMES: Record<string, string> = {
   kolaboratif: "Kolaboratif",
   adaptif: "Adaptif",
   loyal: "Loyal",
@@ -30,8 +34,9 @@ const ASPECT_NAMES = {
 export default function MyResultsPage() {
   const { user } = useStore();
   const [results, setResults] = useState<any[]>([]);
-  const [processedData, setProcessedData] = useState<any>(null);
+  const [weightedData, setWeightedData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (user) {
@@ -45,16 +50,13 @@ export default function MyResultsPage() {
     try {
       setIsLoading(true);
 
-      const data = await ResultsService.getMyResults(user.id);
+      const [rawData, weightedResults] = await Promise.all([
+        ResultsService.getMyResults(user.id),
+        ResultsService.getWeightedResults(user.id),
+      ]);
 
-      if (data && data.length > 0) {
-        setResults(data);
-        const processed = processResultsData(data);
-        setProcessedData(processed);
-      } else {
-        setResults([]);
-        setProcessedData(null);
-      }
+      setResults(rawData || []);
+      setWeightedData(weightedResults);
     } catch (error: any) {
       console.error("Error loading results:", error);
       toast.error("Gagal memuat hasil penilaian: " + error.message);
@@ -63,91 +65,24 @@ export default function MyResultsPage() {
     }
   };
 
-  const processResultsData = (rawData: any[]) => {
-    // Group by aspect
-    const aspectGroups = rawData.reduce((groups, item) => {
-      if (!groups[item.aspect]) {
-        groups[item.aspect] = [];
-      }
-      groups[item.aspect].push(item);
-      return groups;
-    }, {});
-
-    // Process each aspect
-    const aspectResults = Object.entries(aspectGroups).map(
-      ([aspectId, items]: [string, any]) => {
-        const totalRating = items.reduce(
-          (sum: number, item: any) => sum + item.rating,
-          0
-        );
-        const averageRating = totalRating / items.length;
-
-        const feedbackDetails = items.map((item: any) => ({
-          indicator: item.indicator,
-          rating: item.rating,
-          comment: item.comment,
-        }));
-
-        return {
-          id: aspectId,
-          name: ASPECT_NAMES[aspectId as keyof typeof ASPECT_NAMES] || aspectId,
-          averageRating: Math.round(averageRating * 10) / 10,
-          totalFeedback: items.length,
-          feedbackDetails: feedbackDetails,
-          color: getAspectColor(aspectId),
-        };
-      }
-    );
-
-    // Calculate overall stats
-    const totalRating = rawData.reduce((sum, item) => sum + item.rating, 0);
-    const overallRating = totalRating / rawData.length;
-
-    // Get period info
-    const periodInfo = rawData[0]?.assignment?.period;
-
-    return {
-      aspectResults: aspectResults.sort(
-        (a, b) => b.averageRating - a.averageRating
-      ),
-      overallRating: Math.round(overallRating * 10) / 10,
-      totalFeedback: rawData.length,
-      totalAspects: aspectResults.length,
-      periodInfo,
-    };
-  };
-
-  const getAspectColor = (aspectId: string) => {
-    const colors = {
-      kolaboratif: "blue",
-      adaptif: "green",
-      loyal: "red",
-      harmonis: "purple",
-      kompeten: "yellow",
-      akuntabel: "indigo",
-      berorientasi_pelayanan: "pink",
-    };
-    return colors[aspectId as keyof typeof colors] || "gray";
-  };
-
   const getRatingText = (rating: number) => {
-    if (rating >= 9)
+    if (rating >= 90)
       return {
-        text: "Luar Biasa",
+        text: "Istimewa",
         color: "text-green-600",
         bg: "bg-green-100",
       };
-    if (rating >= 8)
+    if (rating >= 80)
       return { text: "Sangat Baik", color: "text-blue-600", bg: "bg-blue-100" };
-    if (rating >= 7)
+    if (rating >= 70)
       return { text: "Baik", color: "text-indigo-600", bg: "bg-indigo-100" };
-    if (rating >= 6)
+    if (rating >= 60)
       return {
         text: "Cukup Baik",
         color: "text-yellow-600",
         bg: "bg-yellow-100",
       };
-    if (rating >= 5)
+    if (rating >= 50)
       return { text: "Cukup", color: "text-orange-600", bg: "bg-orange-100" };
     return { text: "Perlu Perbaikan", color: "text-red-600", bg: "bg-red-100" };
   };
@@ -161,6 +96,35 @@ export default function MyResultsPage() {
       </DashboardLayout>
     );
   }
+
+  // Build comment index per-aspect from raw feedback results
+  // Deduplicate by assessor per aspect to avoid repeated comments per indicator
+  const commentsByAspect: Record<
+    string,
+    Array<{ comment: string; isSupervisor: boolean }>
+  > = (() => {
+    const seenKeys = new Set<string>();
+    return (results || []).reduce((acc: any, item: any) => {
+      if (!item || !item.comment) return acc;
+      const aspectId = item.aspect as string;
+      const assessorId =
+        item?.assignment?.assessor_id || item.assessor_id || "unknown";
+      const dedupeKey = `${assessorId}:${aspectId}`;
+      if (seenKeys.has(dedupeKey)) return acc;
+      seenKeys.add(dedupeKey);
+
+      if (!acc[aspectId]) acc[aspectId] = [];
+      acc[aspectId].push({
+        comment: String(item.comment).trim(),
+        isSupervisor: !!item.isSupervisorFeedback,
+      });
+      return acc;
+    }, {} as Record<string, Array<{ comment: string; isSupervisor: boolean }>>);
+  })();
+
+  const toggleAspect = (aspectId: string) => {
+    setExpanded((prev) => ({ ...prev, [aspectId]: !prev[aspectId] }));
+  };
 
   return (
     <DashboardLayout>
@@ -180,21 +144,22 @@ export default function MyResultsPage() {
                 Hasil Penilaian Saya
               </h1>
               <p className="text-gray-600 text-lg">
-                Hasil penilaian 360° dari rekan kerja Anda
+                Hasil penilaian 360° dengan bobot supervisor 60% + rekan kerja
+                40%
               </p>
             </div>
           </div>
 
-          {processedData?.periodInfo && (
+          {weightedData?.periodInfo && (
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <Calendar className="w-4 h-4" />
               <span>
                 Periode:{" "}
-                {new Date(0, processedData.periodInfo.month - 1).toLocaleString(
+                {new Date(0, weightedData.periodInfo.month - 1).toLocaleString(
                   "id-ID",
                   { month: "long" }
                 )}{" "}
-                {processedData.periodInfo.year}
+                {weightedData.periodInfo.year}
               </span>
             </div>
           )}
@@ -213,8 +178,8 @@ export default function MyResultsPage() {
               Belum Ada Hasil Penilaian
             </h3>
             <p className="text-gray-600 mb-8 max-w-md mx-auto text-lg">
-              Anda belum menerima feedback dari rekan kerja. Hasil akan muncul
-              setelah ada data penilaian yang tersedia.
+              Anda belum menerima feedback dari supervisor atau rekan kerja.
+              Hasil akan muncul setelah ada data penilaian yang tersedia.
             </p>
             <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
               <AlertCircle className="w-5 h-5" />
@@ -223,7 +188,7 @@ export default function MyResultsPage() {
           </motion.div>
         ) : (
           <div className="space-y-8">
-            {/* Overall Summary */}
+            {/* Overall Summary with Weighted Scores */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -236,29 +201,45 @@ export default function MyResultsPage() {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-3xl font-bold mb-2">
-                      Ringkasan Keseluruhan
+                      Skor Final (Berbobot)
                     </h2>
                     <p className="text-white/80">
-                      Performa Anda berdasarkan penilaian 360°
+                      Supervisor 60% + Rekan Kerja 40%
                     </p>
                   </div>
                   <div className="text-right">
                     <div className="text-5xl font-bold mb-2">
-                      {processedData?.overallRating?.toFixed(1) || "0.0"}
+                      {weightedData?.overallScore
+                        ? weightedData.overallScore.toFixed(1)
+                        : "0.0"}
                     </div>
-                    <div className="text-white/80">dari 10.0</div>
+                    <div className="text-white/80">dari 100</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center">
                     <div className="flex items-center justify-center mb-2">
+                      <UserCheck className="w-6 h-6" />
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {weightedData?.supervisorFeedbackCount || 0}
+                    </div>
+                    <div className="text-white/80 text-sm">
+                      Feedback Supervisor
+                    </div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center">
+                    <div className="flex items-center justify-center mb-2">
                       <Users className="w-6 h-6" />
                     </div>
                     <div className="text-2xl font-bold">
-                      {processedData?.totalFeedback || 0}
+                      {weightedData?.peerFeedbackCount || 0}
                     </div>
-                    <div className="text-white/80 text-sm">Total Feedback</div>
+                    <div className="text-white/80 text-sm">
+                      Feedback Rekan Kerja
+                    </div>
                   </div>
 
                   <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center">
@@ -266,7 +247,7 @@ export default function MyResultsPage() {
                       <Award className="w-6 h-6" />
                     </div>
                     <div className="text-2xl font-bold">
-                      {processedData?.totalAspects || 0}
+                      {weightedData?.aspectResults?.length || 0}
                     </div>
                     <div className="text-white/80 text-sm">Aspek Dinilai</div>
                   </div>
@@ -275,64 +256,305 @@ export default function MyResultsPage() {
                     <div className="flex items-center justify-center mb-2">
                       <TrendingUp className="w-6 h-6" />
                     </div>
-                    <div className="text-2xl font-bold">
-                      {processedData
-                        ? Math.round((processedData.overallRating / 10) * 100)
-                        : 0}
-                      %
-                    </div>
-                    <div className="text-white/80 text-sm">Skor Persentase</div>
-                  </div>
-
-                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center">
-                    <div className="flex items-center justify-center mb-2">
-                      <Trophy className="w-6 h-6" />
-                    </div>
-                    <div
-                      className={`text-sm font-medium px-3 py-1 rounded-full bg-white/20`}
-                    >
-                      {processedData
-                        ? getRatingText(processedData.overallRating).text
+                    <div className="text-sm font-medium">
+                      {weightedData?.overallScore
+                        ? getRatingText(weightedData.overallScore).text
                         : "N/A"}
                     </div>
-                    <div className="text-white/80 text-sm mt-1">Kategori</div>
+                    <div className="text-white/80 text-xs mt-1">Kategori</div>
                   </div>
                 </div>
               </div>
             </motion.div>
 
-            {/* Aspects Grid */}
-            <div>
+            {/* Assessment Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
-                className="mb-6"
+                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
               >
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                  Hasil per Aspek Penilaian
-                </h2>
-                <p className="text-gray-600">
-                  Klik pada setiap aspek untuk melihat detail feedback yang Anda
-                  terima
-                </p>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Penilaian Supervisor
+                  </h3>
+                  <div
+                    className={`p-2 rounded-full ${
+                      weightedData?.hasSupervisorAssessment
+                        ? "bg-green-100"
+                        : "bg-gray-100"
+                    }`}
+                  >
+                    <UserCheck
+                      className={`w-5 h-5 ${
+                        weightedData?.hasSupervisorAssessment
+                          ? "text-green-600"
+                          : "text-gray-400"
+                      }`}
+                    />
+                  </div>
+                </div>
+                <div
+                  className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                    weightedData?.hasSupervisorAssessment
+                      ? "bg-green-100 text-green-800"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {weightedData?.hasSupervisorAssessment
+                    ? "Sudah Dinilai (60% bobot)"
+                    : "Belum Dinilai"}
+                </div>
               </motion.div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {processedData?.aspectResults?.map(
-                  (aspect: any, index: number) => (
-                    <motion.div
-                      key={aspect.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 + index * 0.1 }}
-                    >
-                      <AspectCard aspect={aspect} />
-                    </motion.div>
-                  )
-                )}
-              </div>
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Penilaian Rekan Kerja
+                  </h3>
+                  <div
+                    className={`p-2 rounded-full ${
+                      weightedData?.hasPeerAssessment
+                        ? "bg-blue-100"
+                        : "bg-gray-100"
+                    }`}
+                  >
+                    <Users
+                      className={`w-5 h-5 ${
+                        weightedData?.hasPeerAssessment
+                          ? "text-blue-600"
+                          : "text-gray-400"
+                      }`}
+                    />
+                  </div>
+                </div>
+                <div
+                  className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                    weightedData?.hasPeerAssessment
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {weightedData?.hasPeerAssessment
+                    ? "Ada Feedback (40% bobot)"
+                    : "Belum Ada Feedback"}
+                </div>
+              </motion.div>
             </div>
+
+            {/* Weighted Aspect Results */}
+            {weightedData?.aspectResults &&
+              weightedData.aspectResults.length > 0 && (
+                <div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="mb-6"
+                  >
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                      Hasil per Aspek (Berbobot)
+                    </h2>
+                    <p className="text-gray-600">
+                      Skor final per aspek menggunakan bobot supervisor 60% +
+                      rekan kerja 40%
+                    </p>
+                  </motion.div>
+
+                  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">
+                              Aspek
+                            </th>
+                            <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
+                              Skor Supervisor
+                            </th>
+                            <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
+                              Skor Rekan Kerja
+                            </th>
+                            <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
+                              Skor Final
+                            </th>
+                            <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
+                              Total Feedback
+                            </th>
+                            <th className="px-6 py-4 text-center text-sm font-medium text-gray-500 uppercase tracking-wider">
+                              Komentar
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {weightedData.aspectResults.map(
+                            (aspect: any, index: number) => {
+                              const aspectName =
+                                ASPECT_NAMES[aspect.aspect] || aspect.aspect;
+                              const aspectComments =
+                                commentsByAspect[aspect.aspect] || [];
+
+                              return (
+                                <Fragment key={aspect.aspect}>
+                                  <motion.tr
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.5 + index * 0.05 }}
+                                    className="hover:bg-gray-50 transition-colors"
+                                  >
+                                    <td className="px-6 py-4">
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {aspectName}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <div
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                          aspect.supervisorAverage
+                                            ? `${
+                                                getRatingText(
+                                                  aspect.supervisorAverage
+                                                ).bg
+                                              } ${
+                                                getRatingText(
+                                                  aspect.supervisorAverage
+                                                ).color
+                                              }`
+                                            : "bg-gray-100 text-gray-400"
+                                        }`}
+                                      >
+                                        {aspect.supervisorAverage
+                                          ? aspect.supervisorAverage.toFixed(1)
+                                          : "N/A"}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <div
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                          aspect.peerAverage
+                                            ? `${
+                                                getRatingText(
+                                                  aspect.peerAverage
+                                                ).bg
+                                              } ${
+                                                getRatingText(
+                                                  aspect.peerAverage
+                                                ).color
+                                              }`
+                                            : "bg-gray-100 text-gray-400"
+                                        }`}
+                                      >
+                                        {aspect.peerAverage
+                                          ? aspect.peerAverage.toFixed(1)
+                                          : "N/A"}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <div
+                                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                          aspect.finalScore
+                                            ? `${
+                                                getRatingText(aspect.finalScore)
+                                                  .bg
+                                              } ${
+                                                getRatingText(aspect.finalScore)
+                                                  .color
+                                              }`
+                                            : "bg-gray-100 text-gray-400"
+                                        }`}
+                                      >
+                                        <Star className="w-4 h-4 mr-1" />
+                                        {aspect.finalScore
+                                          ? aspect.finalScore.toFixed(1)
+                                          : "N/A"}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center text-sm text-gray-900">
+                                      {aspect.totalFeedback}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <button
+                                        onClick={() =>
+                                          toggleAspect(aspect.aspect)
+                                        }
+                                        className="px-3 py-1 text-sm rounded-full border border-gray-300 hover:bg-gray-50"
+                                      >
+                                        {expanded[aspect.aspect]
+                                          ? "Sembunyikan"
+                                          : "Lihat"}
+                                      </button>
+                                    </td>
+                                  </motion.tr>
+
+                                  <AnimatePresence>
+                                    {expanded[aspect.aspect] && (
+                                      <motion.tr
+                                        key={`${aspect.aspect}-comments`}
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.25 }}
+                                        className="bg-gray-50"
+                                      >
+                                        <td colSpan={6} className="px-6 py-4">
+                                          {aspectComments.length === 0 ? (
+                                            <div className="text-sm text-gray-500">
+                                              Belum ada komentar untuk aspek
+                                              ini.
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-3">
+                                              {aspectComments.map((c, idx) => (
+                                                <motion.div
+                                                  key={idx}
+                                                  initial={{ opacity: 0, y: 6 }}
+                                                  animate={{ opacity: 1, y: 0 }}
+                                                  transition={{
+                                                    duration: 0.2,
+                                                    delay: idx * 0.03,
+                                                  }}
+                                                  className="p-3 bg-white rounded-lg border border-gray-200"
+                                                >
+                                                  <div className="flex items-center justify-between">
+                                                    <div className="text-sm text-gray-900">
+                                                      {c.comment}
+                                                    </div>
+                                                    <div
+                                                      className={`text-xs font-medium ${
+                                                        c.isSupervisor
+                                                          ? "text-purple-600"
+                                                          : "text-blue-600"
+                                                      }`}
+                                                    >
+                                                      {c.isSupervisor
+                                                        ? "Supervisor"
+                                                        : "Rekan Kerja"}
+                                                    </div>
+                                                  </div>
+                                                </motion.div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </td>
+                                      </motion.tr>
+                                    )}
+                                  </AnimatePresence>
+                                </Fragment>
+                              );
+                            }
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
           </div>
         )}
       </div>

@@ -1,16 +1,16 @@
-// src/components/ui/RatingInput.tsx
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star } from "lucide-react";
 
 interface RatingInputProps {
-  value: number;
-  onChange: (rating: number) => void;
-  max?: number;
+  value: number; // actual value in the real scale (e.g., 71-90 or 1-100)
+  onChange: (rating: number) => void; // returns value in the real scale
+  max?: number; // number of stars/segments to display
   size?: "sm" | "md" | "lg";
   showNumber?: boolean;
   disabled?: boolean;
+  minValue?: number; // minimum of real scale (default 1)
+  maxValue?: number; // maximum of real scale (default equals max)
 }
 
 export function RatingInput({
@@ -20,89 +20,143 @@ export function RatingInput({
   size = "md",
   showNumber = true,
   disabled = false,
+  minValue = 1,
+  maxValue,
 }: RatingInputProps) {
-  const [hover, setHover] = useState(0);
+  const effectiveMaxValue = maxValue ?? max;
+
+  // Initialize localValue with the actual value, not a default
+  const [localValue, setLocalValue] = useState<number>(value || minValue);
+  const [inputValue, setInputValue] = useState<string>(
+    (value || minValue).toString()
+  );
+
+  // Update localValue when value prop changes
+  useEffect(() => {
+    setLocalValue(value || minValue);
+    setInputValue((value || minValue).toString());
+  }, [value, minValue]);
 
   const sizeClasses = {
-    sm: "w-6 h-6",
-    md: "w-8 h-8",
-    lg: "w-10 h-10",
+    sm: "text-sm py-2 px-3",
+    md: "text-base py-2.5 px-3.5",
+    lg: "text-lg py-3 px-4",
   };
 
   const getRatingColor = (rating: number) => {
-    if (rating <= 3) return "text-red-500";
-    if (rating <= 6) return "text-yellow-500";
-    if (rating <= 8) return "text-blue-500";
+    if (!rating || rating < minValue) return "text-gray-400";
+
+    // Normalize to 0..1 based on real scale
+    const ratio = (rating - minValue) / (effectiveMaxValue - minValue);
+    if (ratio <= 0.25) return "text-red-500";
+    if (ratio <= 0.5) return "text-yellow-500";
+    if (ratio <= 0.75) return "text-blue-500";
     return "text-green-500";
   };
 
   const getRatingText = (rating: number) => {
-    if (rating === 0) return "Belum dinilai";
-    if (rating <= 2) return "Sangat Kurang";
-    if (rating <= 4) return "Kurang";
-    if (rating <= 6) return "Cukup";
-    if (rating <= 8) return "Baik";
-    return "Sangat Baik";
+    if (!rating || rating < minValue) return "Belum dinilai";
+
+    // Different text based on scale
+    if (minValue === 71) {
+      // User biasa (71-90)
+      if (rating >= 85) return "Sangat Baik";
+      if (rating >= 80) return "Baik";
+      if (rating >= 75) return "Cukup Baik";
+      return "Cukup";
+    } else {
+      // Supervisor (1-100)
+      const ratio = (rating - minValue) / (effectiveMaxValue - minValue);
+      if (ratio <= 0.2) return "Perlu Perbaikan";
+      if (ratio <= 0.4) return "Cukup";
+      if (ratio <= 0.6) return "Baik";
+      if (ratio <= 0.8) return "Sangat Baik";
+      return "Istimewa";
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+
+    // Allow any input while typing
+    setInputValue(rawValue);
+
+    // Only update localValue if it's a valid number
+    const numValue = Number(rawValue);
+    if (!isNaN(numValue)) {
+      setLocalValue(numValue);
+    }
+  };
+
+  const handleInputBlur = () => {
+    const numValue = Number(inputValue);
+
+    // If input is empty or invalid, set to minValue
+    if (inputValue === "" || isNaN(numValue)) {
+      const correctedValue = minValue;
+      setInputValue(correctedValue.toString());
+      setLocalValue(correctedValue);
+      onChange(correctedValue);
+      return;
+    }
+
+    // Apply min/max constraints
+    let constrainedValue = numValue;
+    if (numValue < minValue) {
+      constrainedValue = minValue;
+    } else if (numValue > effectiveMaxValue) {
+      constrainedValue = effectiveMaxValue;
+    }
+
+    setInputValue(constrainedValue.toString());
+    setLocalValue(constrainedValue);
+    onChange(constrainedValue);
   };
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-1">
-          {Array.from({ length: max }, (_, i) => {
-            const rating = i + 1;
-            const isActive = rating <= (hover || value);
-
-            return (
-              <motion.button
-                key={rating}
-                type="button"
-                disabled={disabled}
-                onMouseEnter={() => !disabled && setHover(rating)}
-                onMouseLeave={() => !disabled && setHover(0)}
-                onClick={() => !disabled && onChange(rating)}
-                whileHover={{ scale: disabled ? 1 : 1.1 }}
-                whileTap={{ scale: disabled ? 1 : 0.9 }}
-                className={`
-                  ${sizeClasses[size]} 
-                  transition-all duration-200 
-                  ${
-                    disabled
-                      ? "cursor-not-allowed opacity-50"
-                      : "cursor-pointer"
-                  }
-                  ${isActive ? getRatingColor(rating) : "text-gray-300"}
-                  hover:scale-110
-                `}
-              >
-                <Star
-                  className={`w-full h-full ${isActive ? "fill-current" : ""}`}
-                />
-              </motion.button>
-            );
-          })}
+      <div className="flex items-center justify-center gap-6">
+        {/* Manual Number Input */}
+        <div className="flex items-center space-x-2">
+          <motion.input
+            type="number"
+            min={minValue}
+            max={effectiveMaxValue}
+            step={1}
+            value={inputValue}
+            disabled={disabled}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            className={`w-28 text-center rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              sizeClasses[size]
+            } ${getRatingColor(localValue)} ${
+              disabled ? "bg-gray-100 cursor-not-allowed" : ""
+            }`}
+            whileFocus={{ scale: disabled ? 1 : 1.02 }}
+            placeholder={minValue.toString()}
+          />
         </div>
 
         <AnimatePresence mode="wait">
           {showNumber && (
             <motion.div
-              key={hover || value}
+              key={`v-${localValue}`}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               className="flex items-center space-x-2"
             >
               <span
-                className={`text-2xl font-bold ${getRatingColor(
-                  hover || value
-                )}`}
+                className={`text-2xl font-bold ${getRatingColor(localValue)}`}
               >
-                {hover || value || 0}
+                {localValue || minValue}
               </span>
               <div className="text-right">
-                <div className="text-sm font-medium text-gray-900">/{max}</div>
-                <div className={`text-xs ${getRatingColor(hover || value)}`}>
-                  {getRatingText(hover || value)}
+                <div className="text-sm font-medium text-gray-900">
+                  /{effectiveMaxValue}
+                </div>
+                <div className={`text-xs ${getRatingColor(localValue)}`}>
+                  {getRatingText(localValue)}
                 </div>
               </div>
             </motion.div>
@@ -114,19 +168,37 @@ export function RatingInput({
       <div className="w-full bg-gray-200 rounded-full h-2">
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${((hover || value) / max) * 100}%` }}
+          animate={{
+            width: `${Math.max(
+              0,
+              Math.min(
+                100,
+                ((localValue - minValue) / (effectiveMaxValue - minValue)) * 100
+              )
+            )}%`,
+          }}
           transition={{ duration: 0.3 }}
           className={`h-2 rounded-full ${
-            (hover || value) <= 3
+            localValue <= minValue + 0.25 * (effectiveMaxValue - minValue)
               ? "bg-gradient-to-r from-red-400 to-red-500"
-              : (hover || value) <= 6
+              : localValue <= minValue + 0.5 * (effectiveMaxValue - minValue)
               ? "bg-gradient-to-r from-yellow-400 to-yellow-500"
-              : (hover || value) <= 8
+              : localValue <= minValue + 0.75 * (effectiveMaxValue - minValue)
               ? "bg-gradient-to-r from-blue-400 to-blue-500"
               : "bg-gradient-to-r from-green-400 to-green-500"
           }`}
         />
       </div>
+
+      {/* Helper text for validation */}
+      {localValue < minValue && (
+        <p className="text-red-500 text-xs">Rating minimum adalah {minValue}</p>
+      )}
+      {localValue > effectiveMaxValue && (
+        <p className="text-red-500 text-xs">
+          Rating maksimum adalah {effectiveMaxValue}
+        </p>
+      )}
     </div>
   );
 }

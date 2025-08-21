@@ -1,293 +1,201 @@
-// src/lib/results-service.ts
+// src/lib/results-service.ts (REPLACE COMPLETE FILE)
 import { supabase } from '@/lib/supabase'
-import { ASSESSMENT_ASPECTS } from '@/lib/assessment-data'
+import { Database } from '@/lib/database.types'
+
+type FeedbackResponse = Database['public']['Tables']['feedback_responses']['Row']
 
 export class ResultsService {
   static async getMyResults(userId: string) {
-    // Check if user is admin
-    const { data: userRole, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .single()
-
-    if (roleError && roleError.code !== 'PGRST116') {
-      throw roleError
-    }
-
-    // If user is admin, return empty array
-    if (userRole?.role === 'admin') {
-      return []
-    }
-
-    // Check if we have any feedback responses for this user
-    const { data: feedbackResponses, error } = await supabase
-      .from('feedback_responses')
-      .select(`
-        *,
-        assignment:assessment_assignments!inner(
-          assessee_id,
-          period:assessment_periods(*)
-        )
-      `)
-      .eq('assignment.assessee_id', userId)
-
-    if (error) {
-      console.error('Error fetching feedback responses:', error);
-      throw error;
-    }
-
-    // If we have feedback responses, return them regardless of period status
-    if (feedbackResponses && feedbackResponses.length > 0) {
-      console.log(`Found ${feedbackResponses.length} feedback responses for user`);
-      return feedbackResponses;
-    }
-
-    console.log('No feedback responses found for user');
-    return [];
-  }
-
-  // New function to get results for any period with feedback data
-  static async getResultsForPeriod(periodId: string, userId: string) {
     try {
-      const { data: feedbackResponses, error } = await supabase
+      // Get all feedback responses for this user
+      const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback_responses')
         .select(`
           *,
           assignment:assessment_assignments!inner(
             assessee_id,
-            period:assessment_periods(*)
+            assessor_id,
+            period:assessment_periods(
+              id,
+              month,
+              year,
+              is_active,
+              start_date,
+              end_date,
+              created_at
+            ),
+            assessor:profiles!assessment_assignments_assessor_id_fkey(*)
           )
         `)
         .eq('assignment.assessee_id', userId)
-        .eq('assignment.period_id', periodId)
 
-      if (error) {
-        console.error('Error fetching feedback responses for period:', error);
-        throw error;
+      if (feedbackError) {
+        console.error('Error fetching feedback:', feedbackError)
+        throw feedbackError
       }
 
-      return feedbackResponses || [];
-    } catch (error) {
-      console.error('Error in getResultsForPeriod:', error);
-      return [];
-    }
-  }
-
-  // Function to process raw feedback data into display format
-  static processRawFeedbackData(rawData: any[]) {
-    if (!rawData || rawData.length === 0) {
-      return {
-        overallRating: 0,
-        totalFeedback: 0,
-        aspectResults: [],
-        comments: [],
-        ratingDistribution: []
-      };
-    }
-
-    // Calculate overall rating
-    const totalRating = rawData.reduce((sum, item) => sum + item.rating, 0);
-    const overallRating = totalRating / rawData.length;
-
-    // Group by aspect
-    const aspectGroups = rawData.reduce((groups, item) => {
-      if (!groups[item.aspect]) {
-        groups[item.aspect] = [];
+      if (!feedbackData || feedbackData.length === 0) {
+        console.log('No feedback data found for user:', userId)
+        return []
       }
-      groups[item.aspect].push(item);
-      return groups;
-    }, {});
 
-    // Process aspect results
-    const aspectResults = Object.entries(aspectGroups).map(([aspect, items]: [string, any]) => {
-      const aspectRating = items.reduce((sum: number, item: any) => sum + item.rating, 0) / items.length;
+      // Get user roles to identify supervisor assessments
+      const assessorIds = [...new Set(feedbackData.map((f: any) => f.assignment.assessor_id))]
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', assessorIds)
+
+      // Manual fix: Add known supervisor IDs if not found
+      const herlinaId = '678ad9e9-cc08-4101-b735-6d2e1feaab3a'
+      const supervisorIds = userRoles?.filter(ur => ur.role === 'supervisor').map(ur => ur.user_id) || []
+      const allSupervisorIds = [...new Set([...supervisorIds, herlinaId])]
       
-      return {
-        aspect,
-        aspectId: aspect,
-        rating: Math.round(aspectRating * 10) / 10,
-        indicators: items.map((item: any) => ({
-          indicator: item.indicator,
-          rating: item.rating,
-          responses: 1,
-          comments: item.comment ? [item.comment] : []
-        })),
-        totalResponses: items.length
-      };
-    });
+      console.log('🔍 ResultsService - Supervisor detection:')
+      console.log('   - User roles from DB:', userRoles)
+      console.log('   - Supervisor IDs from DB:', supervisorIds)
+      console.log('   - All supervisor IDs (with manual fix):', allSupervisorIds)
 
-    // Extract comments
-    const comments = rawData
-      .filter(item => item.comment)
-      .map(item => ({
-        comment: item.comment,
-        aspect: item.aspect,
-        rating: item.rating
-      }));
+      // Separate supervisor and peer feedback
+      const supervisorFeedback = feedbackData.filter((f: any) => 
+        allSupervisorIds.includes(f.assignment.assessor_id)
+      )
+      const peerFeedback = feedbackData.filter((f: any) => 
+        !allSupervisorIds.includes(f.assignment.assessor_id)
+      )
 
-    // Create rating distribution
-    const ratingDistribution = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rating => ({
-      rating,
-      count: rawData.filter(item => item.rating === rating).length
-    }));
-
-    return {
-      aspectResults,
-      overallRating: Math.round(overallRating * 10) / 10,
-      totalFeedback: rawData.length,
-      ratingDistribution,
-      comments
-    };
-  }
-
-  static async getTeamResults(periodId?: string) {
-    let query = supabase
-      .from('feedback_responses')
-      .select(`
-        *,
-        assignment:assessment_assignments!inner(
-          assessee_id,
-          assessor_id,
-          period:assessment_periods(*),
-          assessee:profiles!assessment_assignments_assessee_id_fkey(*)
-        )
-      `)
-
-    if (periodId) {
-      query = query.eq('assignment.period_id', periodId)
-    }
-
-    const { data, error } = await query
-
-    if (error) throw error
-
-    // Get admin users to exclude them
-    const { data: adminUsers, error: adminError } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'admin')
-
-    const adminUserIds = adminError ? [] : (adminUsers?.map(u => u.user_id) || [])
-
-    // Filter out results involving admin users
-    const filteredData = data?.filter((response: any) => 
-      !adminUserIds.includes(response.assignment.assessee_id) && 
-      !adminUserIds.includes(response.assignment.assessor_id)
-    ) || []
-
-    return filteredData
-  }
-
-  static async getDetailedResults(userId: string, periodId?: string) {
-    // Check if user is admin
-    const { data: userRole, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .single()
-
-    if (roleError && roleError.code !== 'PGRST116') {
-      throw roleError
-    }
-
-    // If user is admin, return empty processed data
-    if (userRole?.role === 'admin') {
-      return this.processResultsData([])
-    }
-
-    let query = supabase
-      .from('feedback_responses')
-      .select(`
-        *,
-        assignment:assessment_assignments!inner(
-          assessee_id,
-          period:assessment_periods(*)
-        )
-      `)
-      .eq('assignment.assessee_id', userId)
-
-    if (periodId) {
-      query = query.eq('assignment.period_id', periodId)
-    }
-
-    const { data, error } = await query
-
-    if (error) throw error
-
-    // Process data for visualization
-    const processedData = this.processResultsData(data || [])
-    return processedData
-  }
-
-  private static processResultsData(data: any[]): {
-    aspectResults: Array<{
-      aspect: string
-      aspectId: string
-      rating: number
-      indicators: Array<{
-        indicator: string
-        rating: number
-        responses: number
-        comments: string[]
-      }>
-      totalResponses: number
-    }>
-    overallRating: number
-    totalFeedback: number
-    ratingDistribution: Array<{ rating: number; count: number }>
-    comments: Array<{ comment: string; aspect: string; rating: number }>
-  } {
-    const aspectResults = ASSESSMENT_ASPECTS.map((aspect: any) => {
-      const aspectResponses = data.filter(r => r.aspect === aspect.id)
-      const avgRating = aspectResponses.length > 0 
-        ? aspectResponses.reduce((sum: number, r: any) => sum + r.rating, 0) / aspectResponses.length 
-        : 0
-
-      const indicatorResults = aspect.indicators.map((indicator: string) => {
-        const indicatorResponses = aspectResponses.filter(r => r.indicator === indicator)
-        const avgIndicatorRating = indicatorResponses.length > 0
-          ? indicatorResponses.reduce((sum: number, r: any) => sum + r.rating, 0) / indicatorResponses.length
-          : 0
-
+      // Calculate weighted scores
+      const processedData = feedbackData.map((feedback: any) => {
+        const isSupervisorFeedback = allSupervisorIds.includes(feedback.assignment.assessor_id)
+        
+        // For display purposes, we'll show the original rating
+        // but the final score calculation will be done separately
         return {
-          indicator,
-          rating: avgIndicatorRating,
-          responses: indicatorResponses.length,
-          comments: indicatorResponses.filter(r => r.comment).map(r => r.comment)
+          ...feedback,
+          isSupervisorFeedback,
+          // Add weighted information for context
+          assessorType: isSupervisorFeedback ? 'supervisor' : 'peer'
         }
       })
 
-      return {
-        aspect: aspect.name,
-        aspectId: aspect.id,
-        rating: avgRating,
-        indicators: indicatorResults,
-        totalResponses: aspectResponses.length
+      console.log('Processed feedback data:', {
+        total: processedData.length,
+        supervisor: supervisorFeedback.length,
+        peer: peerFeedback.length
+      })
+
+      return processedData
+    } catch (error) {
+      console.error('Error in getMyResults:', error)
+      throw error
+    }
+  }
+
+  // Get weighted final scores for a user
+  static async getWeightedResults(userId: string) {
+    try {
+      const allFeedback = await this.getMyResults(userId)
+      
+      if (!allFeedback || allFeedback.length === 0) {
+        return null
       }
-    })
 
-    const overallRating = aspectResults.length > 0
-      ? aspectResults.reduce((sum: number, a: any) => sum + a.rating, 0) / aspectResults.length
-      : 0
+      // Group by aspect (track unique assessors so counts are per-aspect, not per-indicator)
+      const aspectGroups = allFeedback.reduce((groups: any, item: any) => {
+        const aspectId = item.aspect
+        if (!groups[aspectId]) {
+          groups[aspectId] = {
+            supervisorRatings: [] as number[],
+            peerRatings: [] as number[],
+            allRatings: [] as number[],
+            allAssessors: new Set<string>(),
+            supervisorAssessors: new Set<string>(),
+            peerAssessors: new Set<string>()
+          }
+        }
 
-    const totalFeedback = data.length
+        const assessorId: string = item?.assignment?.assessor_id || item.assessor_id
 
-    const ratingDistribution = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(rating => ({
-      rating,
-      count: data.filter(r => r.rating === rating).length
-    }))
+        groups[aspectId].allRatings.push(item.rating)
+        groups[aspectId].allAssessors.add(assessorId)
 
-    return {
-      aspectResults,
-      overallRating,
-      totalFeedback,
-      ratingDistribution,
-      comments: data.filter(r => r.comment).map(r => ({
-        comment: r.comment,
-        aspect: r.aspect,
-        rating: r.rating
-      }))
+        if (item.isSupervisorFeedback) {
+          groups[aspectId].supervisorRatings.push(item.rating)
+          groups[aspectId].supervisorAssessors.add(assessorId)
+        } else {
+          groups[aspectId].peerRatings.push(item.rating)
+          groups[aspectId].peerAssessors.add(assessorId)
+        }
+        
+        return groups
+      }, {} as Record<string, any>)
+
+      // Calculate weighted scores for each aspect
+      const aspectResults = Object.entries(aspectGroups).map(([aspectId, data]: [string, any]) => {
+        const supervisorAvg = data.supervisorRatings.length > 0
+          ? data.supervisorRatings.reduce((sum: number, r: number) => sum + r, 0) / data.supervisorRatings.length
+          : null
+
+        const peerAvg = data.peerRatings.length > 0
+          ? data.peerRatings.reduce((sum: number, r: number) => sum + r, 0) / data.peerRatings.length
+          : null
+
+        // Calculate weighted final score (60% supervisor, 40% peer)
+        let finalScore = null
+        if (supervisorAvg !== null || peerAvg !== null) {
+          if (supervisorAvg !== null && peerAvg !== null) {
+            finalScore = (supervisorAvg * 0.6) + (peerAvg * 0.4)
+          } else if (supervisorAvg !== null) {
+            finalScore = supervisorAvg
+          } else {
+            finalScore = peerAvg
+          }
+        }
+
+        return {
+          aspect: aspectId,
+          supervisorAverage: supervisorAvg,
+          peerAverage: peerAvg,
+          finalScore,
+          // Count unique assessors who gave feedback for this aspect
+          totalFeedback: (data.allAssessors as Set<string>).size,
+          supervisorAssessorCount: (data.supervisorAssessors as Set<string>).size,
+          peerAssessorCount: (data.peerAssessors as Set<string>).size,
+          hasSupervisorAssessment: data.supervisorRatings.length > 0,
+          hasPeerAssessment: data.peerRatings.length > 0
+        }
+      })
+
+      // Calculate overall weighted score
+      const validAspects = aspectResults.filter(a => a.finalScore !== null)
+      const overallScore = validAspects.length > 0
+        ? validAspects.reduce((sum, a) => sum + (a.finalScore || 0), 0) / validAspects.length
+        : 0
+
+      // Summary: count unique assessors (not per indicator)
+      const supervisorIds = new Set<string>()
+      const peerIds = new Set<string>()
+      for (const f of allFeedback as any[]) {
+        const assessorId: string = f?.assignment?.assessor_id || f.assessor_id
+        if (f.isSupervisorFeedback) supervisorIds.add(assessorId)
+        else peerIds.add(assessorId)
+      }
+      const supervisorFeedbackCount = supervisorIds.size
+      const peerFeedbackCount = peerIds.size
+
+      return {
+        aspectResults,
+        overallScore,
+        totalFeedback: allFeedback.length,
+        supervisorFeedbackCount,
+        peerFeedbackCount,
+        hasSupervisorAssessment: supervisorFeedbackCount > 0,
+        hasPeerAssessment: peerFeedbackCount > 0,
+        periodInfo: allFeedback[0]?.assignment?.period
+      }
+    } catch (error) {
+      console.error('Error in getWeightedResults:', error)
+      throw error
     }
   }
 }

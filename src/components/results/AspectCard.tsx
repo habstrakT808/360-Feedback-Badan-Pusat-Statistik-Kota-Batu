@@ -1,15 +1,9 @@
 // src/components/results/AspectCard.tsx
 "use client";
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  ChevronDown,
-  ChevronUp,
-  Star,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-} from "lucide-react";
+import { motion } from "framer-motion";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ASSESSMENT_ASPECTS } from "@/lib/assessment-data";
 
 interface FeedbackDetail {
   indicator: string;
@@ -51,6 +45,9 @@ const aspectColors = {
 
 export function AspectCard({ aspect }: AspectCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Get aspect details from ASSESSMENT_ASPECTS
+  const aspectDetails = ASSESSMENT_ASPECTS.find((a) => a.id === aspect.id);
 
   const getRatingText = (rating: number) => {
     if (rating >= 9)
@@ -101,162 +98,62 @@ export function AspectCard({ aspect }: AspectCardProps) {
               </p>
             </div>
           </div>
+
           <div className="text-right">
-            <div className="text-3xl font-bold">
-              {aspect.averageRating.toFixed(1)}
-            </div>
-            <div className="text-white/80 text-sm">dari 10.0</div>
+            <div className="text-3xl font-bold">{aspect.averageRating}</div>
+            <div className="text-white/80 text-sm">dari 90</div>
           </div>
         </div>
-      </div>
 
-      {/* Rating Badge & Trend */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <div
-            className={`inline-flex items-center px-4 py-2 rounded-full ${ratingInfo.bg} ${ratingInfo.color} font-medium`}
-          >
-            <Star className="w-4 h-4 mr-2 fill-current" />
-            {ratingInfo.text}
+        {/* Aspect Description */}
+        {aspectDetails && (
+          <div className="mt-4 pt-4 border-t border-white/20">
+            <p className="text-white/90 text-sm leading-relaxed">
+              {aspectDetails.description}
+            </p>
           </div>
-          <div className="flex items-center space-x-2">
-            {getTrendIcon(aspect.averageRating)}
-            <span className="text-sm text-gray-600">Trend</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Expand Button */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 flex items-center justify-center space-x-2 hover:bg-gray-50 transition-colors"
-      >
-        <span className="font-medium text-gray-700">
-          {isExpanded ? "Sembunyikan Detail" : "Lihat Detail Feedback"}
-        </span>
-        {isExpanded ? (
-          <ChevronUp className="w-5 h-5 text-gray-500" />
-        ) : (
-          <ChevronDown className="w-5 h-5 text-gray-500" />
         )}
-      </button>
+      </div>
 
-      {/* Expandable Content */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
-          >
-            <div className="p-6 bg-gray-50 space-y-4">
-              <h4 className="font-semibold text-gray-900 mb-4">
-                Detail Feedback ({aspect.feedbackDetails.length})
-              </h4>
+      {/* Rating Info */}
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <div
+              className={`px-3 py-1 rounded-full text-sm font-medium ${ratingInfo.bg} ${ratingInfo.color}`}
+            >
+              {ratingInfo.text}
+            </div>
+            {getTrendIcon(aspect.averageRating)}
+          </div>
+        </div>
 
-              {aspect.feedbackDetails.map((detail, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="bg-white rounded-xl p-4 border border-gray-200"
+        {/* Indikator (daftar sesuai aspek) */}
+        {aspectDetails && (
+          <div className="mb-4">
+            <h4 className="font-semibold text-gray-900 mb-3">Indikator:</h4>
+            <div className="space-y-2">
+              {aspectDetails.indicators.map((indicator, index) => (
+                <div
+                  key={`${aspect.id}-indicator-${index}`}
+                  className="p-3 bg-gray-50 rounded-lg border border-gray-200"
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <p className="text-gray-800 font-medium text-sm leading-relaxed">
-                        {detail.indicator}
-                      </p>
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">
+                      {index + 1}
                     </div>
-                    <div className="ml-4 flex items-center space-x-2">
-                      <div
-                        className={`px-3 py-1 rounded-full text-sm font-bold ${
-                          detail.rating >= 8
-                            ? "bg-green-100 text-green-700"
-                            : detail.rating >= 6
-                            ? "bg-blue-100 text-blue-700"
-                            : detail.rating >= 4
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {detail.rating}/10
-                      </div>
-                    </div>
-                  </div>
-
-                  {detail.comment && (
-                    <div className="mt-3 p-3 bg-gray-50 rounded-lg border-l-4 border-blue-400">
-                      <p className="text-gray-700 text-sm italic">
-                        "{detail.comment}"
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Rating Bar */}
-                  <div className="mt-3">
-                    <div className="flex items-center space-x-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full transition-all duration-500 ${
-                            detail.rating >= 8
-                              ? "bg-green-500"
-                              : detail.rating >= 6
-                              ? "bg-blue-500"
-                              : detail.rating >= 4
-                              ? "bg-yellow-500"
-                              : "bg-red-500"
-                          }`}
-                          style={{ width: `${(detail.rating / 10) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-500 w-8">
-                        {detail.rating}
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-
-              {/* Summary Stats */}
-              <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold text-green-600">
-                      {
-                        aspect.feedbackDetails.filter((f) => f.rating >= 8)
-                          .length
-                      }
-                    </div>
-                    <div className="text-xs text-gray-600">Sangat Baik</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-yellow-600">
-                      {
-                        aspect.feedbackDetails.filter(
-                          (f) => f.rating >= 5 && f.rating < 8
-                        ).length
-                      }
-                    </div>
-                    <div className="text-xs text-gray-600">Cukup</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-red-600">
-                      {
-                        aspect.feedbackDetails.filter((f) => f.rating < 5)
-                          .length
-                      }
-                    </div>
-                    <div className="text-xs text-gray-600">Perlu Perbaikan</div>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {indicator}
+                    </p>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+
+        {/* Tidak menampilkan feedback per indikator */}
+      </div>
     </motion.div>
   );
 }

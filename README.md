@@ -109,7 +109,7 @@ bps-feedback/
 ### 5. Team Management
 
 - ✅ Team overview with statistics
-- ✅ Employee cards with performance data
+- ✅ Employee cards dengan data performa (menampilkan avatar user jika tersedia)
 - ✅ Advanced filtering and search
 - ✅ Performance distribution charts
 - ✅ Grid/List view toggle
@@ -145,6 +145,12 @@ bps-feedback/
 - ✅ Real-time subscriptions
 - ✅ Automated functions and triggers
 - ✅ Sample data for 18 employees
+
+### 10. Settings & Profile
+
+- ✅ Halaman Settings untuk mengubah profil
+- ✅ Upload foto profil ke Supabase Storage (bucket `avatars`)
+- ✅ Preview avatar di sidebar/topbar dan halaman Tim
 
 ## 🔄 System Workflow
 
@@ -354,6 +360,61 @@ CREATE TABLE system_settings (
    npm run dev
    ```
 
+### Enable Avatar Storage (Wajib untuk fitur foto profil)
+
+1. Buat bucket di Supabase
+
+```sql
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+```
+
+2. Tambah Storage RLS Policies untuk bucket `avatars` (PostgreSQL tidak mendukung IF NOT EXISTS pada policy, jadi pakai drop-then-create)
+
+```sql
+-- READ publik (untuk bucket public)
+drop policy if exists "Public read access to avatars" on storage.objects;
+create policy "Public read access to avatars"
+on storage.objects
+for select
+to public
+using (bucket_id = 'avatars');
+
+-- INSERT: pengguna terautentikasi boleh upload
+drop policy if exists "Authenticated can upload avatars" on storage.objects;
+create policy "Authenticated can upload avatars"
+on storage.objects
+for insert
+to authenticated
+with check (bucket_id = 'avatars');
+
+-- UPDATE: hanya pemilik file
+drop policy if exists "Users can update own avatars" on storage.objects;
+create policy "Users can update own avatars"
+on storage.objects
+for update
+to authenticated
+using (bucket_id = 'avatars' and owner = auth.uid())
+with check (bucket_id = 'avatars' and owner = auth.uid());
+
+-- DELETE: hanya pemilik file
+drop policy if exists "Users can delete own avatars" on storage.objects;
+create policy "Users can delete own avatars"
+on storage.objects
+for delete
+to authenticated
+using (bucket_id = 'avatars' and owner = auth.uid());
+```
+
+3. Tidak perlu perubahan env tambahan. Pastikan `.env.local` sudah berisi `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, dan `SUPABASE_SERVICE_ROLE_KEY` (untuk route admin yang membutuhkan akses server).
+
+4. Penggunaan di aplikasi
+
+- Upload file ke path: `avatars/<userId>/<timestamp>.<ext>`.
+- URL publik diambil via `getPublicUrl` dan disimpan ke `profiles.avatar_url`.
+- Komponen yang diperbarui: `ProfileSettings` (upload), `Navigation` (preview avatar), `/team` (avatar tiap user).
+
 ### Environment Variables
 
 ```env
@@ -539,4 +600,5 @@ BPS Kota Batu 360° Feedback System is a solid application with comprehensive co
 ---
 
 **Happy coding! 🚀✨**
+
 # 360-Feedback-Badan-Pusat-Statistik-Kota-Batu

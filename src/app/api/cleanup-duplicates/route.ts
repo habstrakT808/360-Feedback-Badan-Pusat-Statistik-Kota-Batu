@@ -1,10 +1,10 @@
 // src/app/api/cleanup-duplicates/route.ts
 import { NextResponse } from 'next/server'
-import { SmartNotificationService } from '@/lib/smart-notification-service'
+import { SmartNotificationServiceImproved } from '@/lib/smart-notification-service'
 
 export async function POST() {
   try {
-    await SmartNotificationService.removeDuplicates()
+    await SmartNotificationServiceImproved.removeDuplicates()
     
     return NextResponse.json({
       success: true,

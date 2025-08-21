@@ -97,7 +97,7 @@ export function CommentsSection({ comments }: CommentsSectionProps) {
           ) : (
             filteredComments.map((comment, index) => (
               <motion.div
-                key={index}
+                key={`${comment.aspect}-${comment.rating}-${index}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}

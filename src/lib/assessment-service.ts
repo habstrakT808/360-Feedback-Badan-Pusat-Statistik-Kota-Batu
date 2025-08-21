@@ -1,4 +1,4 @@
-// src/lib/assessment-service.ts
+// src/lib/assessment-service.ts (REPLACE COMPLETE FILE)
 import { supabase } from '@/lib/supabase'
 import { Database } from '@/lib/database.types'
 
@@ -21,41 +21,115 @@ export class AssessmentService {
   }
 
   static async getMyAssignments(userId: string) {
-    // Check if user is admin
-    const { data: userRole, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .single()
+    try {
+      // Check if user is admin or supervisor
+      const { data: userRole, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .single()
 
-    if (roleError && roleError.code !== 'PGRST116') {
-      throw roleError
+      if (roleError && roleError.code !== 'PGRST116') {
+        console.error('Error checking user role:', roleError)
+        throw roleError
+      }
+
+      console.log('User role check:', { userId, role: userRole?.role })
+
+      // If user is admin or supervisor, return empty array (they don't have random assignments)
+      if (userRole?.role === 'admin' || userRole?.role === 'supervisor') {
+        console.log('User is admin or supervisor, returning empty assignments')
+        return []
+      }
+
+      // For regular users, get their assignments for active period
+      const { data: active } = await supabase
+        .from('assessment_periods')
+        .select('id')
+        .eq('is_active', true)
+        .single()
+
+      const activePeriodId = active?.id
+
+      const { data, error } = await supabase
+        .from('assessment_assignments')
+        .select(`
+          *,
+          assessee:profiles!assessment_assignments_assessee_id_fkey(
+            id,
+            full_name,
+            username,
+            position,
+            department,
+            avatar_url
+          ),
+          period:assessment_periods(
+            id,
+            month,
+            year,
+            is_active,
+            start_date,
+            end_date,
+            created_at
+          )
+        `)
+        .eq('assessor_id', userId)
+        .eq('is_completed', false)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching assignments:', error)
+        throw error
+      }
+
+      // If no assignments for the active period, try to generate (server endpoint bypass RLS)
+      if ((data || []).length === 0 && activePeriodId) {
+        try {
+          await fetch('/api/admin/generate-assignments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ periodId: activePeriodId })
+          })
+          // Re-fetch after generation
+          const { data: retry } = await supabase
+            .from('assessment_assignments')
+            .select(`
+              *,
+              assessee:profiles!assessment_assignments_assessee_id_fkey(
+                id,
+                full_name,
+                username,
+                position,
+                department,
+                avatar_url
+              ),
+              period:assessment_periods(
+                id,
+                month,
+                year,
+                is_active,
+                start_date,
+                end_date,
+                created_at
+              )
+            `)
+            .eq('assessor_id', userId)
+            .eq('is_completed', false)
+            .order('created_at', { ascending: false })
+
+          console.log('Assignments after generation:', retry?.length || 0)
+          return retry || []
+        } catch (genErr) {
+          console.warn('Assignment generation skipped:', genErr)
+        }
+      }
+
+      console.log('Regular user assignments:', data?.length || 0)
+      return data || []
+    } catch (error) {
+      console.error('Error in getMyAssignments:', error)
+      throw error
     }
-
-    // If user is admin, return empty array
-    if (userRole?.role === 'admin') {
-      return []
-    }
-
-    const { data, error } = await supabase
-      .from('assessment_assignments')
-      .select(`
-        *,
-        assessee:profiles!assessment_assignments_assessee_id_fkey(
-          id,
-          full_name,
-          username,
-          position,
-          department,
-          avatar_url
-        ),
-        period:assessment_periods(*)
-      `)
-      .eq('assessor_id', userId)
-      .eq('is_completed', false)
-
-    if (error) throw error
-    return data
   }
 
   static async submitFeedback(
@@ -96,12 +170,44 @@ export class AssessmentService {
         *,
         assignment:assessment_assignments!inner(
           assessee_id,
-          period:assessment_periods(*)
+          period:assessment_periods(
+            id,
+            month,
+            year,
+            is_active,
+            start_date,
+            end_date,
+            created_at
+          )
         )
       `)
       .eq('assignment.assessee_id', userId)
 
     if (error) throw error
     return data
+  }
+
+  // Check if user is supervisor
+  static async isSupervisor(userId: string) {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .single()
+
+    if (error) return false
+    return data?.role === 'supervisor'
+  }
+
+  // Check if user is admin
+  static async isAdmin(userId: string) {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .single()
+
+    if (error) return false
+    return data?.role === 'admin'
   }
 }

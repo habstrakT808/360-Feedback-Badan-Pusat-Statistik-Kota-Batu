@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSetUser } from "@/store/useStore";
 import { NotificationService } from "@/lib/notification-service";
-import { SmartNotificationService } from "@/lib/smart-notification-service";
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useSetUser();

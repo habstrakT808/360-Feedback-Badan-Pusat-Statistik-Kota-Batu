@@ -1,14 +1,14 @@
 // src/app/api/generate-notifications/route.ts
 import { NextResponse } from 'next/server'
-import { SmartNotificationService } from '@/lib/smart-notification-service'
+import { SmartNotificationServiceImproved } from '@/lib/smart-notification-service'
 
 export async function POST() {
   try {
-    await SmartNotificationService.generateSimpleNotifications()
+    await SmartNotificationServiceImproved.generateSimpleNotifications()
     
     return NextResponse.json({
       success: true,
-      message: 'Simple notifications generated for all users'
+      message: 'Notifications generated successfully without duplicates'
     })
   } catch (error: any) {
     console.error('Failed to generate notifications:', error)
@@ -21,11 +21,11 @@ export async function POST() {
 
 export async function DELETE() {
   try {
-    await SmartNotificationService.removeDuplicates()
+    await SmartNotificationServiceImproved.removeDuplicates()
     
     return NextResponse.json({
       success: true,
-      message: 'Duplicate notifications cleaned up'
+      message: 'Duplicate notifications cleaned up successfully'
     })
   } catch (error: any) {
     return NextResponse.json({

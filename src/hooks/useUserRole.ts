@@ -1,9 +1,11 @@
+// src/hooks/useUserRole.ts (REPLACE COMPLETE FILE)
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/store/useStore'
 
 export function useUserRole() {
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isSupervisor, setIsSupervisor] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const user = useUser()
 
@@ -17,10 +19,7 @@ export function useUserRole() {
       try {
         console.log('🔍 Checking role for user:', user.id)
         
-        // Use service role client to bypass RLS
-        const supabaseAdmin = supabase // Atau buat admin client jika perlu
-        
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
@@ -31,12 +30,15 @@ export function useUserRole() {
         if (error) {
           console.error('Role check error:', error)
           setIsAdmin(false)
+          setIsSupervisor(false)
         } else {
           setIsAdmin(data?.role === 'admin')
+          setIsSupervisor(data?.role === 'supervisor')
         }
       } catch (error) {
         console.error('Role check exception:', error)
         setIsAdmin(false)
+        setIsSupervisor(false)
       } finally {
         setIsLoading(false)
       }
@@ -45,5 +47,5 @@ export function useUserRole() {
     checkUserRole()
   }, [user?.id])
 
-  return { isAdmin, isLoading }
+  return { isAdmin, isSupervisor, isLoading }
 }

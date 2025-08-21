@@ -1,4 +1,4 @@
-// src/components/layout/Navigation.tsx (UPDATE)
+// src/components/layout/Navigation.tsx (REPLACE COMPLETE FILE)
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, spring } from "framer-motion";
@@ -36,8 +36,9 @@ export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
   const user = useUser();
   const setUser = useSetUser();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isSupervisor } = useUserRole();
   const pathname = usePathname();
+  const [profile, setProfile] = useState<any>(null);
 
   // Custom scrollbar styles
   useEffect(() => {
@@ -67,6 +68,20 @@ export function Navigation() {
       document.head.removeChild(style);
     };
   }, []);
+
+  // Load current user's profile for avatar preview
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, full_name, avatar_url")
+        .eq("id", user.id)
+        .single();
+      if (data) setProfile(data);
+    };
+    loadProfile();
+  }, [user?.id]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -128,7 +143,11 @@ export function Navigation() {
               className="flex items-center space-x-3"
             >
               <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                <img src="/logo-bps.png" alt="BPS Logo" className="w-8 h-8 object-contain" />
+                <img
+                  src="/logo-bps.png"
+                  alt="BPS Logo"
+                  className="w-8 h-8 object-contain"
+                />
               </div>
               <div>
                 <h1 className="text-xl font-bold">BPS Kota Batu</h1>
@@ -145,10 +164,31 @@ export function Navigation() {
               transition={{ delay: 0.1 }}
               className="space-y-3"
             >
+              {/* User Avatar */}
+              <div className="flex items-center justify-center">
+                <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-white/20 bg-white/10 flex items-center justify-center">
+                  {profile?.avatar_url ? (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.full_name || user?.email || "Avatar"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white/80 text-xl font-semibold">
+                      {(profile?.full_name || user?.email || "?")
+                        .slice(0, 1)
+                        .toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* User Name and Email */}
               <div className="text-center">
                 <p className="text-sm font-medium text-white truncate">
-                  {user?.user_metadata?.full_name || user?.email}
+                  {profile?.full_name ||
+                    user?.user_metadata?.full_name ||
+                    user?.email}
                 </p>
                 <p className="text-xs text-slate-400 truncate">{user?.email}</p>
                 {/* Role Badge */}
@@ -157,15 +197,15 @@ export function Navigation() {
                     className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       isAdmin
                         ? "bg-red-100 text-red-800"
+                        : isSupervisor
+                        ? "bg-purple-100 text-purple-800"
                         : "bg-blue-100 text-blue-800"
                     }`}
                   >
-                    {isAdmin ? "Admin" : "User"}
+                    {isAdmin ? "Admin" : isSupervisor ? "Supervisor" : "User"}
                   </span>
                 </div>
               </div>
-
-              {/* Notification Bell - REMOVED */}
             </motion.div>
           </div>
 

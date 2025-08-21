@@ -91,7 +91,7 @@ export function ResultsOverview({ data }: ResultsOverviewProps) {
                 {overallRating.toFixed(1)}
               </div>
               <div className="text-right">
-                <div className="text-sm opacity-90">dari 10.0</div>
+                <div className="text-sm opacity-90">dari 90</div>
                 <div
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${ratingInfo.bg} ${ratingInfo.color}`}
                 >
@@ -102,7 +102,7 @@ export function ResultsOverview({ data }: ResultsOverviewProps) {
           </div>
           <CircularProgress
             value={overallRating}
-            maxValue={10}
+            maxValue={90}
             color="white"
             size={100}
           />

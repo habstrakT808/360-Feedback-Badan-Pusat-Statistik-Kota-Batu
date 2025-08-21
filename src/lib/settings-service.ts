@@ -32,6 +32,38 @@ export class SettingsService {
     }
   }
 
+  // Upload avatar to Supabase Storage and update profile.avatar_url
+  static async uploadAvatar(userId: string, file: File): Promise<UserProfile> {
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg'
+      const fileName = `${Date.now()}.${fileExt}`
+      const filePath = `${userId}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: file.type
+        })
+
+      if (uploadError) throw uploadError
+
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      const avatarUrl = publicUrlData.publicUrl
+
+      // Update profile with new avatar URL
+      const updated = await this.updateProfile(userId, { avatar_url: avatarUrl })
+      return updated
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      throw new Error('Failed to upload avatar')
+    }
+  }
+
   // Update user profile
   static async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
     try {

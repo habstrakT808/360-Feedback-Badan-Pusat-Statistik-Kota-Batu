@@ -26,11 +26,13 @@ const assessmentSchema = z.object({
   responses: z.array(
     z.object({
       aspect: z.string(),
-      indicator: z.string(),
+      aspectName: z.string(),
+      description: z.string(),
+      combinedIndicator: z.string(),
       rating: z
         .number()
-        .min(1, "Rating minimal 1")
-        .max(10, "Rating maksimal 10"),
+        .min(71, "Rating minimal 71")
+        .max(90, "Rating maksimal 90"),
       comment: z.string().optional(),
     })
   ),
@@ -61,14 +63,14 @@ export function AssessmentForm({
   } = useForm<AssessmentForm>({
     resolver: zodResolver(assessmentSchema),
     defaultValues: {
-      responses: ASSESSMENT_ASPECTS.flatMap((aspect) =>
-        aspect.indicators.map((indicator) => ({
-          aspect: aspect.id,
-          indicator,
-          rating: 0,
-          comment: "",
-        }))
-      ),
+      responses: ASSESSMENT_ASPECTS.map((aspect) => ({
+        aspect: aspect.id,
+        aspectName: aspect.name,
+        description: aspect.description,
+        combinedIndicator: aspect.combinedIndicator,
+        rating: 0,
+        comment: "",
+      })),
     },
   });
 
@@ -77,17 +79,36 @@ export function AssessmentForm({
   const totalSteps = ASSESSMENT_ASPECTS.length;
   const progress = ((currentStep + 1) / totalSteps) * 100;
 
-  const currentResponses = responses.filter(
-    (r) => r.aspect === currentAspect.id
-  );
-  const isStepComplete = currentResponses.every((r) => r.rating > 0);
-  const totalComplete = responses.filter((r) => r.rating > 0).length;
+  const currentResponse = responses[currentStep];
+  const isStepComplete =
+    typeof currentResponse?.rating === "number" &&
+    currentResponse.rating >= 71 &&
+    currentResponse.rating <= 90;
+  const totalComplete = responses.filter(
+    (r) => typeof r.rating === "number" && r.rating >= 71 && r.rating <= 90
+  ).length;
   const totalQuestions = responses.length;
 
   const onSubmit = async (data: AssessmentForm) => {
     setIsSubmitting(true);
     try {
-      await AssessmentService.submitFeedback(assignment.id, data.responses);
+      // Transform data to match the expected format for backend
+      const transformedResponses = data.responses.flatMap((response) => {
+        const aspect = ASSESSMENT_ASPECTS.find((a) => a.id === response.aspect);
+        if (!aspect) return [];
+
+        return aspect.indicators.map((indicator) => ({
+          aspect: response.aspect,
+          indicator,
+          rating: response.rating,
+          comment: response.comment || "",
+        }));
+      });
+
+      await AssessmentService.submitFeedback(
+        assignment.id,
+        transformedResponses
+      );
 
       // Celebration animation
       confetti({
@@ -162,28 +183,26 @@ export function AssessmentForm({
             </div>
 
             <div className="text-right">
-              <div className="text-sm text-gray-600">Progress</div>
-              <div className="text-2xl font-bold text-blue-600">
-                {totalComplete}/{totalQuestions}
+              <div className="text-sm text-gray-600 mb-1">
+                Langkah {currentStep + 1} dari {totalSteps}
+              </div>
+              <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-blue-500 to-purple-600"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5 }}
+                />
               </div>
             </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="mt-6">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>
-                Langkah {currentStep + 1} dari {totalSteps}
-              </span>
-              <span>{Math.round(progress)}% selesai</span>
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              Progress {totalComplete}/{totalQuestions}
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.5 }}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full"
-              />
+            <div className="text-sm font-medium text-blue-600">
+              {Math.round((totalComplete / totalQuestions) * 100)}% selesai
             </div>
           </div>
         </motion.div>
@@ -211,167 +230,175 @@ export function AssessmentForm({
                     Aspek {currentStep + 1}: {currentAspect.name}
                   </span>
                 </motion.div>
-                <p className="text-gray-600 max-w-2xl mx-auto">
-                  Berikan penilaian untuk setiap indikator berikut berdasarkan
-                  pengamatan Anda terhadap {assignment.assessee.full_name}
-                </p>
               </div>
 
-              {/* Indicators */}
-              <div className="space-y-8">
-                {currentAspect.indicators.map((indicator, indicatorIndex) => {
-                  const responseIndex = responses.findIndex(
-                    (r) =>
-                      r.aspect === currentAspect.id && r.indicator === indicator
-                  );
-
-                  return (
-                    <motion.div
-                      key={indicator}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: indicatorIndex * 0.1 }}
-                      className="bg-gray-50 rounded-2xl p-6 hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                          {indicator}
-                        </h3>
+              {/* Single Rating Section */}
+              <div className="bg-gray-50 rounded-2xl p-8 hover:bg-gray-100 transition-colors">
+                {/* Detailed Indicators */}
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-900 mb-3 text-center">
+                    Indikator Detail yang Dinilai:
+                  </h4>
+                  <div className="space-y-3">
+                    {currentAspect.indicators.map((indicator, index) => (
+                      <div
+                        key={`${currentAspect.id}-indicator-${index}`}
+                        className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm"
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold">
+                            {index + 1}
+                          </div>
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {indicator}
+                          </p>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
 
-                      <Controller
-                        control={control}
-                        name={`responses.${responseIndex}.rating`}
-                        render={({ field }) => (
-                          <RatingInput
-                            value={field.value}
-                            onChange={field.onChange}
-                            max={10}
-                            size="md"
-                          />
-                        )}
+                <div className="flex justify-center mb-6">
+                  <Controller
+                    control={control}
+                    name={`responses.${currentStep}.rating`}
+                    render={({ field }) => (
+                      <RatingInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        max={10}
+                        minValue={71}
+                        maxValue={90}
+                        size="lg"
                       />
+                    )}
+                  />
+                </div>
 
-                      {/* Comment Section */}
-                      <div className="mt-6">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShowCommentFor(
-                              showCommentFor ===
-                                `${currentStep}-${indicatorIndex}`
-                                ? null
-                                : `${currentStep}-${indicatorIndex}`
-                            )
-                          }
-                          className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          <span className="text-sm font-medium">
-                            Tambah Komentar (Opsional)
-                          </span>
-                        </button>
+                {typeof currentResponse?.rating === "number" && (
+                  <div className="text-center text-sm mt-1">
+                    {isStepComplete ? (
+                      <span className="text-green-600 font-medium">
+                        Rating: {currentResponse.rating}/90
+                      </span>
+                    ) : currentResponse.rating < 71 ||
+                      currentResponse.rating > 90 ? (
+                      <span className="text-red-600 font-medium">
+                        Hanya bisa memasukkan angka dari 71-90
+                      </span>
+                    ) : null}
+                  </div>
+                )}
 
-                        <AnimatePresence>
-                          {showCommentFor ===
-                            `${currentStep}-${indicatorIndex}` && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.3 }}
-                              className="mt-3"
-                            >
-                              <Controller
-                                control={control}
-                                name={`responses.${responseIndex}.comment`}
-                                render={({ field }) => (
-                                  <textarea
-                                    {...field}
-                                    placeholder="Berikan komentar atau saran untuk perbaikan..."
-                                    className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                    rows={3}
-                                  />
-                                )}
-                              />
-                            </motion.div>
+                {/* Comment Section */}
+                <div className="mt-8">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowCommentFor(
+                        showCommentFor === `step-${currentStep}`
+                          ? null
+                          : `step-${currentStep}`
+                      )
+                    }
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors mx-auto"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      Tambah Komentar (Opsional)
+                    </span>
+                  </button>
+
+                  <AnimatePresence>
+                    {showCommentFor === `step-${currentStep}` && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="mt-4"
+                      >
+                        <Controller
+                          control={control}
+                          name={`responses.${currentStep}.comment`}
+                          render={({ field }) => (
+                            <textarea
+                              {...field}
+                              placeholder="Berikan komentar atau saran untuk perbaikan aspek ini..."
+                              className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                              rows={3}
+                            />
                           )}
-                        </AnimatePresence>
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
 
-              {/* Navigation */}
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
+              {/* Navigation Buttons */}
+              <div className="flex items-center justify-between mt-8">
                 <motion.button
                   type="button"
                   onClick={prevStep}
                   disabled={currentStep === 0}
                   whileHover={{ scale: currentStep === 0 ? 1 : 1.05 }}
                   whileTap={{ scale: currentStep === 0 ? 1 : 0.95 }}
-                  className="flex items-center space-x-2 px-6 py-3 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-medium transition-all ${
+                    currentStep === 0
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronLeft className="w-4 h-4" />
                   <span>Sebelumnya</span>
                 </motion.button>
 
-                <div className="flex items-center space-x-3">
-                  {!isStepComplete && (
-                    <div className="flex items-center space-x-2 text-orange-600 bg-orange-50 px-4 py-2 rounded-xl">
-                      <AlertCircle className="w-4 h-4" />
-                      <span className="text-sm">Lengkapi semua penilaian</span>
-                    </div>
-                  )}
-
-                  {isStepComplete && (
-                    <div className="flex items-center space-x-2 text-green-600 bg-green-50 px-4 py-2 rounded-xl">
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm">Langkah selesai</span>
-                    </div>
-                  )}
-
-                  {currentStep < totalSteps - 1 ? (
-                    <motion.button
-                      type="button"
-                      onClick={nextStep}
-                      disabled={!isStepComplete}
-                      whileHover={{ scale: isStepComplete ? 1.05 : 1 }}
-                      whileTap={{ scale: isStepComplete ? 0.95 : 1 }}
-                      className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <span>Selanjutnya</span>
-                      <ChevronRight className="w-5 h-5" />
-                    </motion.button>
-                  ) : (
-                    <motion.button
-                      type="submit"
-                      disabled={
-                        !responses.every((r) => r.rating > 0) || isSubmitting
-                      }
-                      whileHover={{
-                        scale: responses.every((r) => r.rating > 0) ? 1.05 : 1,
-                      }}
-                      whileTap={{
-                        scale: responses.every((r) => r.rating > 0) ? 0.95 : 1,
-                      }}
-                      className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-3 rounded-xl hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          <span>Mengirim...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-5 h-5" />
-                          <span>Kirim Penilaian</span>
-                        </>
-                      )}
-                    </motion.button>
-                  )}
-                </div>
+                {currentStep === totalSteps - 1 ? (
+                  <motion.button
+                    type="submit"
+                    disabled={!isStepComplete || isSubmitting}
+                    whileHover={{
+                      scale: isStepComplete && !isSubmitting ? 1.05 : 1,
+                    }}
+                    whileTap={{
+                      scale: isStepComplete && !isSubmitting ? 0.95 : 1,
+                    }}
+                    className={`flex items-center space-x-2 px-8 py-3 rounded-xl font-medium transition-all ${
+                      isStepComplete && !isSubmitting
+                        ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 shadow-lg"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Mengirim...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Submit Assessment</span>
+                      </>
+                    )}
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    type="button"
+                    onClick={nextStep}
+                    disabled={!isStepComplete}
+                    whileHover={{ scale: isStepComplete ? 1.05 : 1 }}
+                    whileTap={{ scale: isStepComplete ? 0.95 : 1 }}
+                    className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-medium transition-all ${
+                      isStepComplete
+                        ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 shadow-lg"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    <span>Selanjutnya</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </motion.button>
+                )}
               </div>
             </motion.div>
           </AnimatePresence>

@@ -7,7 +7,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExportButton } from "@/components/export/ExportButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { DashboardService, DashboardStats } from "@/lib/dashboard-service";
-import { SmartNotificationService } from "@/lib/smart-notification-service";
+import { SmartNotificationServiceImproved } from "@/lib/smart-notification-service";
 import { useStore } from "@/store/useStore";
 import {
   Users,
@@ -47,11 +47,11 @@ export default function Dashboard() {
       // Generate notifications only once per session
       const notificationsGenerated = sessionStorage.getItem(`notifications_${user.id}`)
       if (!notificationsGenerated) {
-        SmartNotificationService.generateForUser(user.id)
+        SmartNotificationServiceImproved.generateForUser(user.id)
           .then(() => {
             sessionStorage.setItem(`notifications_${user.id}`, 'true')
           })
-          .catch((error) => {
+          .catch((error: any) => {
             console.error("Failed to generate notifications:", error);
           });
       }
