@@ -36,6 +36,8 @@ export default function Dashboard() {
     averageRating: 0,
     myAssignments: [],
     currentPeriodData: null,
+    isSupervisor: false,
+    maxAssignments: 5,
   });
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,18 +46,30 @@ export default function Dashboard() {
     if (user) {
       loadDashboardData();
 
-      // Generate notifications only once per session
+      // Generate notifications only once per session with better duplicate prevention
       const notificationsGenerated = sessionStorage.getItem(
         `notifications_${user.id}`
       );
-      if (!notificationsGenerated) {
+      const lastGenerationTime = sessionStorage.getItem(
+        `notifications_time_${user.id}`
+      );
+      
+      const shouldGenerateNotifications = !notificationsGenerated || 
+        (lastGenerationTime && (Date.now() - parseInt(lastGenerationTime)) > 24 * 60 * 60 * 1000); // 24 hours
+
+      if (shouldGenerateNotifications) {
+        console.log('🔄 Generating notifications for user:', user.id);
         SmartNotificationServiceImproved.generateForUser(user.id)
           .then(() => {
             sessionStorage.setItem(`notifications_${user.id}`, "true");
+            sessionStorage.setItem(`notifications_time_${user.id}`, Date.now().toString());
+            console.log('✅ Notifications generated successfully');
           })
           .catch((error: any) => {
             console.error("Failed to generate notifications:", error);
           });
+      } else {
+        console.log('⏭️ Notifications already generated for this session');
       }
     }
   }, [user]);
@@ -84,6 +98,8 @@ export default function Dashboard() {
         averageRating: 0,
         myAssignments: [],
         currentPeriodData: null,
+        isSupervisor: false,
+        maxAssignments: 5,
       });
       setRecentActivities([]);
     } finally {
@@ -218,7 +234,11 @@ export default function Dashboard() {
                   {stats.completedAssessments}
                 </p>
                 <p className="text-xs text-gray-500">
-                  dari {stats.totalEmployees} karyawan
+                  dari{" "}
+                  {stats.isSupervisor
+                    ? stats.totalEmployees
+                    : stats.maxAssignments}{" "}
+                  karyawan
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-500" />
@@ -236,10 +256,14 @@ export default function Dashboard() {
                   {stats.pendingAssessments}
                 </p>
                 <p className="text-xs text-gray-500">
-                  dari {stats.totalEmployees} karyawan
+                  dari{" "}
+                  {stats.isSupervisor
+                    ? stats.totalEmployees
+                    : stats.maxAssignments}{" "}
+                  karyawan
                 </p>
               </div>
-              <Clock className="w-8 h-8 text-orange-500" />
+              <Clock className="w-8 h-8 text-orange-600" />
             </div>
           </motion.div>
 
@@ -254,9 +278,9 @@ export default function Dashboard() {
                   {stats.myProgress}%
                 </p>
                 <p className="text-xs text-gray-500">
-                  {stats.totalEmployees > 0
+                  {stats.isSupervisor
                     ? `${stats.completedAssessments} dari ${stats.totalEmployees} karyawan`
-                    : "Tidak ada karyawan"}
+                    : `${stats.completedAssessments} dari ${stats.maxAssignments} karyawan`}
                 </p>
               </div>
               <TrendingUp className="w-8 h-8 text-purple-500" />
@@ -310,7 +334,9 @@ export default function Dashboard() {
                 >
                   {stats.currentPeriodData
                     ? stats.pendingAssessments > 0
-                      ? `Nilai ${stats.pendingAssessments} rekan kerja Anda untuk periode ini`
+                      ? stats.isSupervisor
+                        ? `Nilai ${stats.pendingAssessments} rekan kerja Anda untuk periode ini`
+                        : `Nilai ${stats.pendingAssessments} dari ${stats.maxAssignments} rekan kerja yang ditugaskan`
                       : "Tidak ada penilaian yang tersisa"
                     : "Tidak ada periode aktif untuk penilaian"}
                 </p>
@@ -402,7 +428,9 @@ export default function Dashboard() {
                 <div className="flex justify-between">
                   <span>Total Assignment:</span>
                   <span className="font-medium text-blue-600">
-                    {stats.totalEmployees}
+                    {stats.isSupervisor
+                      ? stats.totalEmployees
+                      : stats.maxAssignments}
                   </span>
                 </div>
                 <div className="flex justify-between">

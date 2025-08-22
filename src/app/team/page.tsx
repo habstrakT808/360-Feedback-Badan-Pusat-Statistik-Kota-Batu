@@ -19,6 +19,8 @@ import {
   BarChart3,
   UserCheck,
   Filter,
+  Globe,
+  Lock,
 } from "lucide-react";
 
 // Component for regular users (existing functionality)
@@ -45,6 +47,14 @@ function RegularTeamView() {
       toast.error("Gagal memuat data tim: " + error.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleViewProfile = (member: any) => {
+    if (member.allow_public_view) {
+      window.location.href = `/team/user/${member.id}`;
+    } else {
+      toast.error("Profil ini bersifat privat");
     }
   };
 
@@ -86,7 +96,11 @@ function RegularTeamView() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+            whileHover={{ y: -4, scale: 1.02 }}
+            className={`bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 cursor-pointer ${
+              member.allow_public_view ? "hover:border-blue-300" : ""
+            }`}
+            onClick={() => handleViewProfile(member)}
           >
             <div className="text-center">
               <div className="w-16 h-16 rounded-full overflow-hidden mx-auto mb-4 bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
@@ -110,6 +124,28 @@ function RegularTeamView() {
               )}
               {member.department && (
                 <p className="text-gray-500 text-sm">{member.department}</p>
+              )}
+
+              {/* Public Profile Indicator */}
+              <div className="mt-4">
+                {member.allow_public_view ? (
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                    <Globe className="w-4 h-4" />
+                    <span>Profil Publik</span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">
+                    <Lock className="w-4 h-4" />
+                    <span>Profil Privat</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Click to view message */}
+              {member.allow_public_view && (
+                <p className="text-blue-600 text-sm mt-2 font-medium">
+                  Klik untuk lihat profil lengkap →
+                </p>
               )}
             </div>
           </motion.div>

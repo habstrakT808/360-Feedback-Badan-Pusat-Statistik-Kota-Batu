@@ -299,20 +299,39 @@ export class SmartNotificationServiceImproved {
   // Public method for single user
   static async generateForUser(userId: string): Promise<void> {
     try {
-      // Check recent generation
-      const recentCheck = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() // 2 hours
+      console.log(`🔍 Checking notifications for user ${userId}...`)
       
-      const { data: recentNotifications } = await supabase
+      // Check if user already has the 3 required notifications
+      const { data: existingNotifications } = await supabase
         .from('notifications')
-        .select('id')
+        .select('id, title, type, created_at, metadata')
         .eq('user_id', userId)
         .eq('type', 'system')
-        .gte('created_at', recentCheck)
+        .order('created_at', { ascending: false })
 
-      if (recentNotifications && recentNotifications.length >= 3) {
-        console.log(`User ${userId} already has recent notifications, skipping...`)
-        return
+      if (existingNotifications && existingNotifications.length >= 3) {
+        // Check if user has all 3 types of notifications
+        const hasWelcome = existingNotifications.some(n => 
+          n.metadata?.notification_type === 'welcome' || 
+          n.title?.includes('Selamat datang')
+        )
+        const hasTips = existingNotifications.some(n => 
+          n.metadata?.notification_type === 'tips' || 
+          n.title?.includes('Tips')
+        )
+        const hasAssignment = existingNotifications.some(n => 
+          n.metadata?.notification_type === 'assignment' || 
+          n.title?.includes('Penilaian Menunggu')
+        )
+
+        if (hasWelcome && hasTips && hasAssignment) {
+          console.log(`User ${userId} already has all 3 required notifications, skipping...`)
+          return
+        }
       }
+
+      // Clean up any existing duplicates for this user first
+      await this.cleanupUserDuplicates(userId)
 
       const { data: user } = await supabase
         .from('profiles')
@@ -325,6 +344,75 @@ export class SmartNotificationServiceImproved {
       }
     } catch (error) {
       console.error('Failed to generate notifications for user:', error)
+    }
+  }
+
+  // Clean up duplicates for specific user
+  private static async cleanupUserDuplicates(userId: string): Promise<void> {
+    try {
+      console.log(`🧹 Cleaning up duplicates for user ${userId}...`)
+      
+      // Get all notifications for this user
+      const { data: userNotifications } = await supabase
+        .from('notifications')
+        .select('id, title, message, created_at, metadata')
+        .eq('user_id', userId)
+        .eq('type', 'system')
+        .order('created_at', { ascending: false })
+
+      if (!userNotifications || userNotifications.length === 0) return
+
+      // Group by notification type
+      const groupedByType = new Map<string, any[]>()
+      
+      userNotifications.forEach(notification => {
+        let type = 'unknown'
+        
+        if (notification.metadata?.notification_type) {
+          type = notification.metadata.notification_type
+        } else if (notification.title?.includes('Selamat datang')) {
+          type = 'welcome'
+        } else if (notification.title?.includes('Tips')) {
+          type = 'tips'
+        } else if (notification.title?.includes('Penilaian Menunggu')) {
+          type = 'assignment'
+        }
+        
+        if (!groupedByType.has(type)) {
+          groupedByType.set(type, [])
+        }
+        groupedByType.get(type)!.push(notification)
+      })
+
+      const idsToDelete: string[] = []
+      
+      // For each type, keep only the most recent notification
+      groupedByType.forEach((notifications, type) => {
+        if (notifications.length > 1) {
+          // Sort by created_at and keep the most recent
+          notifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          // Add all but the first (most recent) to deletion list
+          idsToDelete.push(...notifications.slice(1).map(n => n.id))
+        }
+      })
+
+      if (idsToDelete.length > 0) {
+        console.log(`Deleting ${idsToDelete.length} duplicate notifications for user ${userId}`)
+        
+        // Delete in batches
+        const batchSize = 50
+        for (let i = 0; i < idsToDelete.length; i += batchSize) {
+          const batch = idsToDelete.slice(i, i + batchSize)
+          await supabase
+            .from('notifications')
+            .delete()
+            .in('id', batch)
+        }
+
+        console.log(`✅ Removed ${idsToDelete.length} duplicate notifications for user ${userId}`)
+      }
+    } catch (error) {
+      console.error(`Failed to cleanup duplicates for user ${userId}:`, error)
     }
   }
 
