@@ -241,12 +241,6 @@ export class TeamService {
         feedbackData?.map((f: any) => f.assignment.assessor_id) || []
       )
       let totalFeedback = uniqueAssessors.size
-
-      // For Eka, we know the actual total feedback from database analysis
-      if (userId === 'd22c96f8-d4c3-42d3-9368-925fec3016c9') {
-        totalFeedback = 3 // 3 unique assessors (1 supervisor + 2 rekan kerja)
-        console.log('🎯 Overriding Eka\'s totalFeedback to 3 (actual database value)')
-      }
       let averageRating = 0
 
       // Log feedback debugging
@@ -336,59 +330,37 @@ export class TeamService {
         console.log('🚨 No feedback data found, trying to bypass RLS...')
         
         try {
-          // Use the database function that was created to bypass RLS
-          const { data: functionData, error: functionError } = await supabase
-            .rpc('get_user_performance_data', { 
-              target_user_id: userId,
-              current_period_id: targetPeriodId 
+          // Use direct query to bypass RLS restrictions
+          const { data: directData, error: directError } = await supabase
+            .from('feedback_responses')
+            .select(`
+              *,
+              assignment:assessment_assignments!inner(
+                id,
+                period_id,
+                assessee_id,
+                assessor_id,
+                is_completed
+              )
+            `)
+            .eq('assignment.assessee_id', userId)
+
+          if (directError) {
+            console.log('❌ Direct query error:', directError)
+            console.log('🔍 Error details:', {
+              message: directError.message,
+              code: directError.code,
+              details: directError.details
             })
-
-          if (functionError) {
-            console.log('❌ Database function error:', functionError)
-            console.log('🔍 Trying alternative approach with service role...')
-            
-            // Alternative: Use direct query with proper error handling
-            const { data: directData, error: directError } = await supabase
-              .from('feedback_responses')
-              .select(`
-                *,
-                assignment:assessment_assignments!inner(
-                  id,
-                  period_id,
-                  assessee_id,
-                  assessor_id,
-                  is_completed
-                )
-              `)
-              .eq('assignment.assessee_id', userId)
-
-            if (directError) {
-              console.log('❌ Direct query error:', directError)
-              console.log('🔍 Error details:', {
-                message: directError.message,
-                code: directError.code,
-                details: directError.details
-              })
-            } else {
-              console.log('✅ Direct query success:', {
-                count: directData?.length || 0,
-                isDirect: true
-              })
-              
-              if (directData && directData.length > 0) {
-                feedbackData = directData
-                console.log('🔄 Using direct query data (RLS bypassed)')
-              }
-            }
           } else {
-            console.log('✅ Database function success:', {
-              count: functionData?.length || 0,
-              isFunction: true
+            console.log('✅ Direct query success:', {
+              count: directData?.length || 0,
+              isDirect: true
             })
             
-            if (functionData && functionData.length > 0) {
-              feedbackData = functionData
-              console.log('🔄 Using database function data (RLS bypassed)')
+            if (directData && directData.length > 0) {
+              feedbackData = directData
+              console.log('🔄 Using direct query data (RLS bypassed)')
             }
           }
         } catch (bypassError) {
@@ -425,12 +397,6 @@ export class TeamService {
       // Count completed assessments where this user is the assessor
       let completedAssessments = assessorAssignments?.filter((a: any) => a.is_completed)?.length || 0
 
-      // For Eka, we know the actual completed assessments from database analysis
-      if (userId === 'd22c96f8-d4c3-42d3-9368-925fec3016c9') {
-        completedAssessments = 2 // 2 completed assignments from SQL query
-        console.log('🎯 Overriding Eka\'s completedAssessments to 2 (actual database value)')
-      }
-
       // Log assignment debugging
       console.log('📋 Assignment debug:', {
         assessorAssignmentsCount: assessorAssignments?.length || 0,
@@ -453,12 +419,7 @@ export class TeamService {
         .eq('role', 'admin')
 
       const adminUserIds = adminError ? [] : (adminUsers?.map(u => u.user_id) || [])
-      let totalEmployees = (allProfiles?.length || 0) - adminUserIds.length
-
-      // For Eka, we know the actual total employees from SQL query
-      if (userId === 'd22c96f8-d4c3-42d3-9368-925fec3016c9') {
-        totalEmployees = 18 // From SQL query result (excluding admin)
-      }
+      const totalEmployees = (allProfiles?.length || 0) - adminUserIds.length
 
       // Log employee count debugging
       console.log('👥 Employee count debug:', {
