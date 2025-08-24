@@ -1,5 +1,5 @@
 // src/lib/reminder-service.ts
-import { supabase } from '../../lib/supabase';
+import { supabase } from './supabase';
 import { NotificationService } from './notification-service';
 import { EmailService } from './email-service';
 

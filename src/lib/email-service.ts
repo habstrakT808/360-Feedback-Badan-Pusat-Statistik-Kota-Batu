@@ -1,5 +1,5 @@
 // src/lib/email-service.ts
-import { supabase } from '../../lib/supabase';
+import { supabase } from './supabase';
 import { NotificationService } from './notification-service';
 
 // Advanced email service with comprehensive functionality

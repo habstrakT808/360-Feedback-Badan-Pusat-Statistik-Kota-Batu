@@ -447,6 +447,92 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_pins: {
+        Row: {
+          id: string
+          giver_id: string
+          receiver_id: string
+          given_at: string
+          week_number: number
+          year: number
+          month: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          giver_id: string
+          receiver_id: string
+          given_at?: string
+          week_number: number
+          year: number
+          month: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          giver_id?: string
+          receiver_id?: string
+          given_at?: string
+          week_number?: number
+          year?: number
+          month?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_pins_giver_id_fkey"
+            columns: ["giver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_pins_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_pin_allowance: {
+        Row: {
+          id: string
+          user_id: string
+          week_number: number
+          year: number
+          pins_remaining: number
+          pins_used: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          week_number: number
+          year: number
+          pins_remaining?: number
+          pins_used?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          week_number?: number
+          year?: number
+          pins_remaining?: number
+          pins_used?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_pin_allowance_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

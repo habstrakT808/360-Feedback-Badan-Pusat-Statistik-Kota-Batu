@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { toast } from "react-hot-toast";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 

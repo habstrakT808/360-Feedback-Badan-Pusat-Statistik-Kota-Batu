@@ -1,5 +1,5 @@
 // lib/settings-service.ts
-import { supabase } from '@/lib/supabase'
+import { supabase } from '../src/lib/supabase'
 import { Database } from '@/lib/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']

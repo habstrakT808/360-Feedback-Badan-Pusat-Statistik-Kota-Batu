@@ -13,8 +13,9 @@ import {
   Menu,
   X,
   Bell,
+  Pin,
 } from "lucide-react";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { useUser, useSetUser } from "@/store/useStore";
 import { toast } from "react-hot-toast";
 import { usePathname } from "next/navigation";
@@ -25,6 +26,7 @@ const navigation = [
   { name: "Beri Penilaian", href: "/assessment", icon: BarChart3 },
   { name: "Hasil Saya", href: "/my-results", icon: Award },
   { name: "Tim", href: "/team", icon: Users },
+  { name: "Sistem Pin", href: "/pins", icon: Pin },
   { name: "Notifikasi", href: "/notifications", icon: Bell },
   { name: "Pengaturan", href: "/settings", icon: Settings },
 ];

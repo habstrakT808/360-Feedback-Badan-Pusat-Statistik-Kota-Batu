@@ -7,6 +7,7 @@ import { Loading } from "@/components/ui/Loading";
 import { supabase } from "@/lib/supabase";
 import { TeamService } from "@/lib/team-service";
 import { toast } from "react-hot-toast";
+import { FloatingComments } from "@/components/team/FloatingComments";
 import {
   ArrowLeft,
   Star,
@@ -222,8 +223,7 @@ export default function PublicProfilePage() {
   const tabs = [
     { id: "overview", name: "Overview", icon: BarChart3 },
     { id: "performance", name: "Performa", icon: TrendingUp },
-    { id: "strengths", name: "Kekuatan", icon: Award },
-    { id: "improvement", name: "Pengembangan", icon: Target },
+    { id: "strengths", name: "Komentar", icon: Award },
   ];
 
   return (
@@ -371,12 +371,12 @@ export default function PublicProfilePage() {
           <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
             {/* Tabs */}
             <div className="border-b">
-              <nav className="flex">
+              <nav className="flex overflow-x-auto scrollbar-hide">
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                    className={`flex-shrink-0 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === tab.id
                         ? "border-blue-500 text-blue-600 bg-blue-50"
                         : "border-transparent text-gray-500 hover:text-gray-700"
@@ -676,98 +676,7 @@ export default function PublicProfilePage() {
                   )}
 
                   {activeTab === "strengths" && (
-                    <div className="space-y-6">
-                      <div className="text-center mb-6">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                          Kekuatan & Keunggulan
-                        </h3>
-                        <p className="text-gray-600">
-                          Aspek-aspek yang menjadi keunggulan dan kekuatan utama
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {performance?.strengths.map((strength, index) => (
-                          <div
-                            key={index}
-                            className="bg-green-50 rounded-xl p-6 border border-green-200"
-                          >
-                            <div className="flex items-center space-x-3 mb-3">
-                              <div className="p-2 bg-green-500 rounded-lg">
-                                <CheckCircle className="w-5 h-5 text-white" />
-                              </div>
-                              <div className="h-1 flex-1 bg-green-300 rounded" />
-                            </div>
-                            <h4 className="font-semibold text-gray-900 mb-2">
-                              {strength}
-                            </h4>
-                            <p className="text-sm text-gray-600">
-                              Aspek yang menunjukkan performa excellent dan
-                              konsisten
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === "improvement" && (
-                    <div className="space-y-6">
-                      <div className="text-center mb-6">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                          Area Pengembangan
-                        </h3>
-                        <p className="text-gray-600">
-                          Peluang untuk terus berkembang dan meningkatkan
-                          kemampuan
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {performance?.areasForImprovement.map((area, index) => (
-                          <div
-                            key={index}
-                            className="bg-orange-50 rounded-xl p-6 border border-orange-200"
-                          >
-                            <div className="flex items-center space-x-3 mb-4">
-                              <div className="p-3 bg-orange-500 rounded-lg">
-                                <Target className="w-6 h-6 text-white" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex space-x-1">
-                                  {[...Array(3)].map((_, i) => (
-                                    <div
-                                      key={i}
-                                      className="w-1 h-8 bg-orange-400 rounded-full"
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                            <h4 className="font-bold text-xl text-gray-900 mb-3">
-                              {area}
-                            </h4>
-                            <p className="text-gray-700 mb-4">
-                              Area yang memiliki potensi besar untuk
-                              pengembangan lebih lanjut
-                            </p>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">
-                                  Potensi Pengembangan
-                                </span>
-                                <span className="font-medium text-orange-600">
-                                  75%
-                                </span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div className="bg-orange-500 h-2 rounded-full w-3/4" />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <FloatingComments userId={userId} />
                   )}
                 </>
               )}
