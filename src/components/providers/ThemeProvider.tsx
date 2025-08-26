@@ -11,8 +11,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const theme: "light" = "light";
-  const resolvedTheme: "light" = "light";
+  const theme = "light" as const;
+  const resolvedTheme = "light" as const;
 
   useEffect(() => {
     // Always apply light theme

@@ -13,8 +13,12 @@ type NotificationPreferencesUpdate = Database['public']['Tables']['notification_
 
 // Export interfaces that match database structure
 export interface Notification extends NotificationRow {}
-export interface NotificationInsertType extends NotificationInsert {}
-export interface NotificationPreferences extends NotificationPreferencesRow {}
+export interface NotificationInsertType extends NotificationInsert {
+  // Add any additional properties if needed
+}
+export interface NotificationPreferences extends NotificationPreferencesRow {
+  // Add any additional properties if needed
+}
 
 export interface NotificationAnalytics {
   total_notifications: number
