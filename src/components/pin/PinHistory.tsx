@@ -12,7 +12,7 @@ interface PinHistoryItem {
   receiver: {
     id: string;
     full_name: string;
-    avatar_url?: string;
+    avatar_url: string | null;
   };
   created_at: string;
   week_number: number;
