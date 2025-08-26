@@ -312,15 +312,15 @@ export class SmartNotificationServiceImproved {
       if (existingNotifications && existingNotifications.length >= 3) {
         // Check if user has all 3 types of notifications
         const hasWelcome = existingNotifications.some(n => 
-          n.metadata?.notification_type === 'welcome' || 
+          (typeof n.metadata === 'object' && n.metadata && 'notification_type' in n.metadata && n.metadata.notification_type === 'welcome') || 
           n.title?.includes('Selamat datang')
         )
         const hasTips = existingNotifications.some(n => 
-          n.metadata?.notification_type === 'tips' || 
+          (typeof n.metadata === 'object' && n.metadata && 'notification_type' in n.metadata && n.metadata.notification_type === 'tips') || 
           n.title?.includes('Tips')
         )
         const hasAssignment = existingNotifications.some(n => 
-          n.metadata?.notification_type === 'assignment' || 
+          (typeof n.metadata === 'object' && n.metadata && 'notification_type' in n.metadata && n.metadata.notification_type === 'assignment') || 
           n.title?.includes('Penilaian Menunggu')
         )
 
@@ -368,7 +368,7 @@ export class SmartNotificationServiceImproved {
       userNotifications.forEach(notification => {
         let type = 'unknown'
         
-        if (notification.metadata?.notification_type) {
+        if (typeof notification.metadata === 'object' && notification.metadata && 'notification_type' in notification.metadata && typeof notification.metadata.notification_type === 'string') {
           type = notification.metadata.notification_type
         } else if (notification.title?.includes('Selamat datang')) {
           type = 'welcome'

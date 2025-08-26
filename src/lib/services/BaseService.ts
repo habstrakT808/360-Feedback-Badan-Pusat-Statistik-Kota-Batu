@@ -115,6 +115,6 @@ export abstract class BaseService {
   }
 
   protected createErrorResponse<T>(error: string): ApiResponse<T> {
-    return this.createApiResponse(false, undefined, error);
+    return this.createApiResponse(false, null as any, error);
   }
 }

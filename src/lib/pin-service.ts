@@ -468,9 +468,10 @@ export class PinService {
         .eq('year', year)
         .limit(5)
       
-      console.log('🔧 Existing pins found:', existingPins)
+      const pins = existingPins || []
+      console.log('🔧 Existing pins found:', pins)
       
-      if (existingPins && Array.isArray(existingPins) && existingPins.length > 0) {
+      if (pins.length > 0) {
         console.log('🔧 Test pins already exist for week', weekNumber, year)
         return
       }

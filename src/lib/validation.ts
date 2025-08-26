@@ -98,7 +98,7 @@ export function handleValidationError(error: unknown): string {
     return error.message;
   }
   if (error instanceof z.ZodError) {
-    return error.errors.map(e => e.message).join(', ');
+    return error.issues.map(e => e.message).join(', ');
   }
   if (error instanceof Error) {
     return error.message;
