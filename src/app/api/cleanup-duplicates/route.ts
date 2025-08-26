@@ -29,8 +29,12 @@ export async function POST(request: NextRequest) {
       const userId = notification.user_id
       let type = 'unknown'
       
-      if (notification.metadata?.notification_type) {
-        type = notification.metadata.notification_type
+      if (notification.metadata && 
+          typeof notification.metadata === 'object' && 
+          notification.metadata !== null &&
+          'notification_type' in notification.metadata &&
+          typeof (notification.metadata as any).notification_type === 'string') {
+        type = (notification.metadata as any).notification_type
       } else if (notification.title?.includes('Selamat datang')) {
         type = 'welcome'
       } else if (notification.title?.includes('Tips')) {

@@ -14,10 +14,7 @@ const eslintConfig = [
   {
     rules: {
       // Disable problematic rules for deployment
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unused-vars": "warn",
-      "@typescript-eslint/no-empty-object-type": "off",
-      "@typescript-eslint/prefer-as-const": "off",
+      "no-unused-vars": "warn",
       "prefer-const": "warn",
       "react-hooks/exhaustive-deps": "warn",
       "react/no-unescaped-entities": "off",
