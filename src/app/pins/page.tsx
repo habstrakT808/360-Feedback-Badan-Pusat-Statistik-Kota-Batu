@@ -26,7 +26,7 @@ import {
 
 export default function PinsPage() {
   const { user } = useStore();
-  const { userRole } = useUserRole();
+  const { isAdmin, isSupervisor, isLoading: roleLoading } = useUserRole();
   const [weeklyRanking, setWeeklyRanking] = useState<PinRanking[]>([]);
   const [monthlyRanking, setMonthlyRanking] = useState<PinRanking[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
