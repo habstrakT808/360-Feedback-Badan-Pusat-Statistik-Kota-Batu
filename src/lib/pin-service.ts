@@ -12,11 +12,11 @@ export interface PinRanking {
   rank: number
 }
 
-export interface WeeklyPinAllowance {
+export interface MonthlyPinAllowance {
   user_id: string
   pins_remaining: number
   pins_used: number
-  week_number?: number
+  month?: number
   year?: number
   last_reset_at?: string
 }
@@ -69,40 +69,35 @@ export class PinService {
 
   // Mendapatkan apakah hari ini adalah hari Jumat
   static isFriday(): boolean {
-    // Developer mode: selalu return true untuk testing
-    if (process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENABLE_PIN_TESTING === 'true') {
-      return true
-    }
     return new Date().getDay() === 5 // 0 = Minggu, 5 = Jumat
   }
 
-  // Mendapatkan allowance pin mingguan untuk user
-  static async getWeeklyPinAllowance(userId: string): Promise<WeeklyPinAllowance | null> {
-    // Gunakan helper function untuk konsistensi
-    const { weekNumber, year } = this.getConsistentWeekNumber()
+  // Mendapatkan allowance pin bulanan untuk user
+  static async getMonthlyPinAllowance(userId: string): Promise<MonthlyPinAllowance | null> {
+    const { month, year } = this.getConsistentWeekNumber()
 
-    // Cek allowance yang ada di database
-    const { data, error } = await supabase
-      .from('weekly_pin_allowance')
+    // Cek allowance yang ada di database (tabel bulanan)
+    const { data, error } = await (supabase as any)
+      .from('monthly_pin_allowance')
       .select('*')
       .eq('user_id', userId)
-      .eq('week_number', weekNumber)
+      .eq('month', month)
       .eq('year', year)
       .single()
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching pin allowance:', error)
+      console.error('Error fetching monthly pin allowance:', error)
       return null
     }
 
     if (!data) {
       // Buat allowance baru jika belum ada
-      const { data: newAllowance, error: createError } = await supabase
-        .from('weekly_pin_allowance')
+      const { data: newAllowance, error: createError } = await (supabase as any)
+        .from('monthly_pin_allowance')
         .insert({
           user_id: userId,
-          week_number: weekNumber,
-          year: year,
+          month,
+          year,
           pins_remaining: 4,
           pins_used: 0
         })
@@ -110,41 +105,51 @@ export class PinService {
         .single()
 
       if (createError) {
-        console.error('Error creating pin allowance:', createError)
+        console.error('Error creating monthly pin allowance:', createError)
         return null
       }
 
       return {
-        user_id: newAllowance.user_id,
-        pins_remaining: newAllowance.pins_remaining,
-        pins_used: newAllowance.pins_used,
-        week_number: newAllowance.week_number,
-        year: newAllowance.year,
+        user_id: (newAllowance as any).user_id,
+        pins_remaining: (newAllowance as any).pins_remaining,
+        pins_used: (newAllowance as any).pins_used,
+        month: (newAllowance as any).month,
+        year: (newAllowance as any).year,
         last_reset_at: new Date().toISOString(),
       }
     }
 
     return {
-      user_id: data.user_id,
-      pins_remaining: data.pins_remaining,
-      pins_used: data.pins_used,
-      week_number: data.week_number,
-      year: data.year,
+      user_id: (data as any).user_id,
+      pins_remaining: (data as any).pins_remaining,
+      pins_used: (data as any).pins_used,
+      month: (data as any).month,
+      year: (data as any).year,
       last_reset_at: new Date().toISOString(),
     }
   }
 
   // Memberikan pin kepada user lain
   static async givePin(giverId: string, receiverId: string): Promise<boolean> {
-    // Cek apakah hari ini Jumat
-    if (!this.isFriday()) {
-      throw new Error('Pin hanya dapat diberikan pada hari Jumat')
+    // Validasi periode pin aktif
+    const today = new Date()
+    const todayStr = today.toISOString().slice(0, 10)
+    const { data: activePeriod, error: apError } = await (supabase as any)
+      .from('pin_periods')
+      .select('*')
+      .eq('is_active', true)
+      .single()
+    if (apError || !activePeriod) {
+      throw new Error('Tidak ada pin period aktif saat ini')
+    }
+    if (!(todayStr >= activePeriod.start_date && todayStr <= activePeriod.end_date)) {
+      throw new Error('Di luar rentang tanggal pin period aktif')
     }
 
-    // Cek allowance pin
-    const allowance = await this.getWeeklyPinAllowance(giverId)
+    // Cek allowance pin bulanan
+    const allowance = await this.getMonthlyPinAllowance(giverId)
     if (!allowance || allowance.pins_remaining <= 0) {
-      throw new Error('Anda tidak memiliki pin tersisa untuk minggu ini')
+      throw new Error('Anda tidak memiliki pin tersisa untuk bulan ini')
     }
 
     console.log('🔍 Giving pin:', { giverId, receiverId, allowance })
@@ -170,10 +175,10 @@ export class PinService {
       throw new Error('Gagal memberikan pin')
     }
 
-    // Update allowance dengan logging yang lebih detail
+    // Update allowance bulanan dengan logging yang lebih detail
     console.log('🔍 Updating allowance:', {
       userId: giverId,
-      weekNumber,
+      month,
       year,
       currentRemaining: allowance.pins_remaining,
       newRemaining: allowance.pins_remaining - 1,
@@ -181,14 +186,14 @@ export class PinService {
       newUsed: allowance.pins_used + 1
     })
 
-    const { data: updatedAllowance, error: allowanceError } = await supabase
-      .from('weekly_pin_allowance')
+    const { data: updatedAllowance, error: allowanceError } = await (supabase as any)
+      .from('monthly_pin_allowance')
       .update({
         pins_remaining: allowance.pins_remaining - 1,
         pins_used: allowance.pins_used + 1
       })
       .eq('user_id', giverId)
-      .eq('week_number', weekNumber)
+      .eq('month', month)
       .eq('year', year)
       .select()
 
@@ -569,6 +574,65 @@ export class PinService {
     }
 
     return data || []
+  }
+
+  // Membatalkan pin yang sudah diberikan
+  static async cancelPin(pinId: string, giverId: string): Promise<void> {
+    // 1) Ambil data pin untuk mengetahui bulan dan tahun
+    const { data: pin, error: fetchError } = await supabase
+      .from('employee_pins')
+      .select('id, giver_id, month, year')
+      .eq('id', pinId)
+      .single()
+
+    if (fetchError || !pin) {
+      console.error('Error fetching pin to cancel:', fetchError)
+      throw new Error('Pin tidak ditemukan')
+    }
+
+    if (pin.giver_id !== giverId) {
+      throw new Error('Anda hanya dapat membatalkan pin yang Anda berikan')
+    }
+
+    // 2) Hapus pin
+    const { error: deleteError } = await supabase
+      .from('employee_pins')
+      .delete()
+      .eq('id', pinId)
+
+    if (deleteError) {
+      console.error('Error deleting pin:', deleteError)
+      throw new Error('Gagal membatalkan pin')
+    }
+
+    // 3) Kembalikan allowance bulanan
+    const { data: allowance, error: allowanceFetchError } = await (supabase as any)
+      .from('monthly_pin_allowance')
+      .select('*')
+      .eq('user_id', giverId)
+      .eq('month', pin.month)
+      .eq('year', pin.year)
+      .single()
+
+    if (allowanceFetchError) {
+      console.warn('Monthly allowance not found when cancelling pin:', allowanceFetchError)
+      return
+    }
+
+    const newPinsUsed = Math.max(0, (allowance as any).pins_used - 1)
+    const newPinsRemaining = Math.min(4, (allowance as any).pins_remaining + 1)
+
+    const { error: allowanceUpdateError } = await (supabase as any)
+      .from('monthly_pin_allowance')
+      .update({ pins_used: newPinsUsed, pins_remaining: newPinsRemaining })
+      .eq('user_id', giverId)
+      .eq('month', pin.month)
+      .eq('year', pin.year)
+
+    if (allowanceUpdateError) {
+      console.error('Error updating monthly allowance after cancel:', allowanceUpdateError)
+      // tidak throw; pin sudah dihapus, allowance bisa disesuaikan manual bila perlu
+    }
   }
 
   // Mendapatkan total pin yang diterima user

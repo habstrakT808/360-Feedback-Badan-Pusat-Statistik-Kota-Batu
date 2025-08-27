@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface RatingInputProps {
-  value: number; // actual value in the real scale (e.g., 71-90 or 1-100)
+  value?: number; // actual value in the real scale (e.g., 71-90 or 1-100)
   onChange: (rating: number) => void; // returns value in the real scale
   max?: number; // number of stars/segments to display
   size?: "sm" | "md" | "lg";
@@ -25,17 +25,24 @@ export function RatingInput({
 }: RatingInputProps) {
   const effectiveMaxValue = maxValue ?? max;
 
-  // Initialize localValue with the actual value, not a default
-  const [localValue, setLocalValue] = useState<number>(value || minValue);
+  // Initialize with empty when no value provided
+  const [localValue, setLocalValue] = useState<number | null>(
+    typeof value === "number" ? value : null
+  );
   const [inputValue, setInputValue] = useState<string>(
-    (value || minValue).toString()
+    typeof value === "number" ? value.toString() : ""
   );
 
   // Update localValue when value prop changes
   useEffect(() => {
-    setLocalValue(value || minValue);
-    setInputValue((value || minValue).toString());
-  }, [value, minValue]);
+    if (typeof value === "number") {
+      setLocalValue(value);
+      setInputValue(value.toString());
+    } else {
+      setLocalValue(null);
+      setInputValue("");
+    }
+  }, [value]);
 
   const sizeClasses = {
     sm: "text-sm py-2 px-3",
@@ -43,8 +50,9 @@ export function RatingInput({
     lg: "text-lg py-3 px-4",
   };
 
-  const getRatingColor = (rating: number) => {
-    if (!rating || rating < minValue) return "text-gray-400";
+  const getRatingColor = (rating: number | null) => {
+    if (rating === null || isNaN(rating) || rating < minValue)
+      return "text-gray-400";
 
     // Normalize to 0..1 based on real scale
     const ratio = (rating - minValue) / (effectiveMaxValue - minValue);
@@ -54,8 +62,9 @@ export function RatingInput({
     return "text-green-500";
   };
 
-  const getRatingText = (rating: number) => {
-    if (!rating || rating < minValue) return "Belum dinilai";
+  const getRatingText = (rating: number | null) => {
+    if (rating === null || isNaN(rating) || rating < minValue)
+      return "Belum dinilai";
 
     // Different text based on scale
     if (minValue === 71) {
@@ -91,12 +100,10 @@ export function RatingInput({
   const handleInputBlur = () => {
     const numValue = Number(inputValue);
 
-    // If input is empty or invalid, set to minValue
+    // If input is empty or invalid, keep empty and do not emit change
     if (inputValue === "" || isNaN(numValue)) {
-      const correctedValue = minValue;
-      setInputValue(correctedValue.toString());
-      setLocalValue(correctedValue);
-      onChange(correctedValue);
+      setLocalValue(null);
+      setInputValue("");
       return;
     }
 
@@ -133,14 +140,14 @@ export function RatingInput({
               disabled ? "bg-gray-100 cursor-not-allowed" : ""
             }`}
             whileFocus={{ scale: disabled ? 1 : 1.02 }}
-            placeholder={minValue.toString()}
+            placeholder={""}
           />
         </div>
 
         <AnimatePresence mode="wait">
           {showNumber && (
             <motion.div
-              key={`v-${localValue}`}
+              key={`v-${localValue ?? "empty"}`}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
@@ -149,7 +156,7 @@ export function RatingInput({
               <span
                 className={`text-2xl font-bold ${getRatingColor(localValue)}`}
               >
-                {localValue || minValue}
+                {localValue === null ? "" : localValue}
               </span>
               <div className="text-right">
                 <div className="text-sm font-medium text-gray-900">
@@ -169,17 +176,25 @@ export function RatingInput({
         <motion.div
           initial={{ width: 0 }}
           animate={{
-            width: `${Math.max(
-              0,
-              Math.min(
-                100,
-                ((localValue - minValue) / (effectiveMaxValue - minValue)) * 100
-              )
-            )}%`,
+            width: `${
+              localValue === null
+                ? 0
+                : Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      ((localValue - minValue) /
+                        (effectiveMaxValue - minValue)) *
+                        100
+                    )
+                  )
+            }%`,
           }}
           transition={{ duration: 0.3 }}
           className={`h-2 rounded-full ${
-            localValue <= minValue + 0.25 * (effectiveMaxValue - minValue)
+            localValue === null
+              ? "bg-gray-300"
+              : localValue <= minValue + 0.25 * (effectiveMaxValue - minValue)
               ? "bg-gradient-to-r from-red-400 to-red-500"
               : localValue <= minValue + 0.5 * (effectiveMaxValue - minValue)
               ? "bg-gradient-to-r from-yellow-400 to-yellow-500"
@@ -191,10 +206,10 @@ export function RatingInput({
       </div>
 
       {/* Helper text for validation */}
-      {localValue < minValue && (
+      {localValue !== null && localValue < minValue && (
         <p className="text-red-500 text-xs">Rating minimum adalah {minValue}</p>
       )}
-      {localValue > effectiveMaxValue && (
+      {localValue !== null && localValue > effectiveMaxValue && (
         <p className="text-red-500 text-xs">
           Rating maksimum adalah {effectiveMaxValue}
         </p>

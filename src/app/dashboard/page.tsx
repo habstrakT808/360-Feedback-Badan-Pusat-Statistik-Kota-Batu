@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, Variants, spring } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useUserRole } from "@/hooks/useUserRole";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExportButton } from "@/components/export/ExportButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -27,6 +28,7 @@ import {
 export default function Dashboard() {
   const router = useRouter();
   const { user } = useStore();
+  const { isAdmin } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
     totalEmployees: 0,
     completedAssessments: 0,
@@ -43,6 +45,12 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (isAdmin) {
+      router.replace("/admin");
+    }
+  }, [isAdmin, router]);
+
+  useEffect(() => {
     if (user) {
       loadDashboardData();
 
@@ -53,23 +61,28 @@ export default function Dashboard() {
       const lastGenerationTime = sessionStorage.getItem(
         `notifications_time_${user.id}`
       );
-      
-      const shouldGenerateNotifications = !notificationsGenerated || 
-        (lastGenerationTime && (Date.now() - parseInt(lastGenerationTime)) > 24 * 60 * 60 * 1000); // 24 hours
+
+      const shouldGenerateNotifications =
+        !notificationsGenerated ||
+        (lastGenerationTime &&
+          Date.now() - parseInt(lastGenerationTime) > 24 * 60 * 60 * 1000); // 24 hours
 
       if (shouldGenerateNotifications) {
-        console.log('🔄 Generating notifications for user:', user.id);
+        console.log("🔄 Generating notifications for user:", user.id);
         SmartNotificationServiceImproved.generateForUser(user.id)
           .then(() => {
             sessionStorage.setItem(`notifications_${user.id}`, "true");
-            sessionStorage.setItem(`notifications_time_${user.id}`, Date.now().toString());
-            console.log('✅ Notifications generated successfully');
+            sessionStorage.setItem(
+              `notifications_time_${user.id}`,
+              Date.now().toString()
+            );
+            console.log("✅ Notifications generated successfully");
           })
           .catch((error: any) => {
             console.error("Failed to generate notifications:", error);
           });
       } else {
-        console.log('⏭️ Notifications already generated for this session');
+        console.log("⏭️ Notifications already generated for this session");
       }
     }
   }, [user]);

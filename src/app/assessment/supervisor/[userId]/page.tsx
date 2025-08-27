@@ -359,7 +359,9 @@ export default function SupervisorAssessmentPage() {
         {/* Assessment Form - Per Aspek */}
         <div className="space-y-8">
           {ASSESSMENT_ASPECTS.map((aspect, aspectIndex) => {
-            const response = responses[aspect.id] || { rating: 1, comment: "" };
+            const response =
+              responses[aspect.id] ||
+              ({ rating: undefined, comment: "" } as any);
 
             return (
               <motion.div

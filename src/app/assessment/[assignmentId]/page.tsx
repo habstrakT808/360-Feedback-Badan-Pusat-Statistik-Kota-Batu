@@ -63,6 +63,25 @@ export default function RegularAssessmentPage() {
       }
 
       setAssignment(targetAssignment);
+
+      // If assignment already completed, load existing responses for editing
+      if (targetAssignment.is_completed) {
+        const existing = await AssessmentService.getExistingResponses(
+          targetAssignment.id
+        );
+        if (existing && existing.length > 0) {
+          const responseMap: any = {};
+          existing.forEach((resp: any) => {
+            if (!responseMap[resp.aspect]) {
+              responseMap[resp.aspect] = {
+                rating: resp.rating,
+                comment: resp.comment || "",
+              };
+            }
+          });
+          setResponses(responseMap);
+        }
+      }
     } catch (error: any) {
       console.error("Error loading assignment:", error);
       toast.error("Gagal memuat data assignment: " + error.message);
@@ -152,7 +171,11 @@ export default function RegularAssessmentPage() {
       // clear draft on success
       if (draftKey) DraftService.clear(draftKey);
 
-      toast.success("Penilaian berhasil disimpan!");
+      toast.success(
+        assignment.is_completed
+          ? "Penilaian berhasil diperbarui!"
+          : "Penilaian berhasil disimpan!"
+      );
       router.push("/assessment");
     } catch (error: any) {
       console.error("Error submitting assessment:", error);
@@ -276,10 +299,12 @@ export default function RegularAssessmentPage() {
         {/* Assessment Form - Per Aspek */}
         <div className="space-y-8">
           {ASSESSMENT_ASPECTS.map((aspect, aspectIndex) => {
-            const response = responses[aspect.id] || {
-              rating: 71,
-              comment: "",
-            };
+            const response =
+              responses[aspect.id] ||
+              ({
+                rating: undefined,
+                comment: "",
+              } as any);
 
             return (
               <motion.div

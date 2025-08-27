@@ -1,6 +1,7 @@
 // src/app/my-results/page.tsx (REPLACE COMPLETE FILE)
 "use client";
 import { useState, useEffect, Fragment } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "@/store/useStore";
 import { ResultsService } from "@/lib/results-service";
@@ -9,6 +10,7 @@ import { Loading } from "@/components/ui/Loading";
 import { toast } from "react-hot-toast";
 import { ASSESSMENT_ASPECTS } from "@/lib/assessment-data";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Trophy,
   AlertCircle,
@@ -33,10 +35,18 @@ const ASPECT_NAMES: Record<string, string> = {
 
 export default function MyResultsPage() {
   const { user } = useStore();
+  const router = useRouter();
+  const { isAdmin } = useUserRole();
   const [results, setResults] = useState<any[]>([]);
   const [weightedData, setWeightedData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (isAdmin) {
+      router.replace("/admin");
+    }
+  }, [isAdmin, router]);
 
   useEffect(() => {
     if (user) {

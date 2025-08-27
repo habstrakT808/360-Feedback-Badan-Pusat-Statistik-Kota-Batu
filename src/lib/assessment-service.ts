@@ -74,7 +74,9 @@ export class AssessmentService {
           )
         `)
         .eq('assessor_id', userId)
-        .eq('is_completed', false)
+        // Include both completed and not completed assignments
+        // but only for the current active period
+        .eq('period_id', activePeriodId)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -114,7 +116,7 @@ export class AssessmentService {
               )
             `)
             .eq('assessor_id', userId)
-            .eq('is_completed', false)
+            .eq('period_id', activePeriodId)
             .order('created_at', { ascending: false })
 
           console.log('Assignments after generation:', retry?.length || 0)
@@ -141,6 +143,14 @@ export class AssessmentService {
       comment?: string
     }>
   ) {
+    // Remove existing responses to allow editing
+    const { error: deleteError } = await supabase
+      .from('feedback_responses')
+      .delete()
+      .eq('assignment_id', assignmentId)
+
+    if (deleteError) throw deleteError
+
     const { error: feedbackError } = await supabase
       .from('feedback_responses')
       .insert(
@@ -161,6 +171,16 @@ export class AssessmentService {
       .eq('id', assignmentId)
 
     if (assignmentError) throw assignmentError
+  }
+
+  static async getExistingResponses(assignmentId: string) {
+    const { data, error } = await supabase
+      .from('feedback_responses')
+      .select('*')
+      .eq('assignment_id', assignmentId)
+
+    if (error) throw error
+    return data || []
   }
 
   static async getMyFeedback(userId: string) {

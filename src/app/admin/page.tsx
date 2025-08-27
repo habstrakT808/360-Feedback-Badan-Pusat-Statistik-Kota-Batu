@@ -20,6 +20,8 @@ import {
 import { toast } from "react-hot-toast";
 import { AdminGuard } from "@/components/auth/AdminGuard";
 import { CreatePeriodModal } from "@/components/admin/CreatePeriodModal";
+import { PinPeriodAdmin } from "@/components/admin/PinPeriodAdmin";
+import { TriwulanPeriodAdmin } from "@/components/admin/TriwulanPeriodAdmin";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -46,6 +48,8 @@ export default function AdminPage() {
     { id: "overview", name: "Overview", icon: BarChart3 },
     { id: "users", name: "Users", icon: Users },
     { id: "periods", name: "Periods", icon: Calendar },
+    { id: "pin_periods", name: "Pin Periods", icon: Calendar },
+    { id: "triwulan_periods", name: "Triwulan Periods", icon: Calendar },
     { id: "activity", name: "Activity", icon: Activity },
     { id: "settings", name: "Settings", icon: Settings },
   ];
@@ -160,13 +164,13 @@ export default function AdminPage() {
               />
             )}
 
-                         {activeTab === "periods" && (
-               <PeriodManagement
-                 onCreatePeriod={handleCreatePeriod}
-                 onEditPeriod={handleEditPeriod}
-                 onPeriodCreated={handlePeriodCreated}
-               />
-             )}
+            {activeTab === "periods" && (
+              <PeriodManagement
+                onCreatePeriod={handleCreatePeriod}
+                onEditPeriod={handleEditPeriod}
+                onPeriodCreated={handlePeriodCreated}
+              />
+            )}
 
             {activeTab === "activity" && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -192,6 +196,9 @@ export default function AdminPage() {
                 </p>
               </div>
             )}
+
+            {activeTab === "pin_periods" && <PinPeriodAdmin />}
+            {activeTab === "triwulan_periods" && <TriwulanPeriodAdmin />}
           </motion.div>
         </div>
       </DashboardLayout>

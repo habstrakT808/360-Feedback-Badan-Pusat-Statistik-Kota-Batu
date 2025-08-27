@@ -19,14 +19,9 @@ import {
   Mail,
   Lock,
   Globe,
-  Target,
   CheckCircle,
   Activity,
   LineChart,
-  Trophy,
-  Shield,
-  Diamond,
-  Crown,
 } from "lucide-react";
 
 interface UserProfile {
@@ -471,64 +466,7 @@ export default function PublicProfilePage() {
                         </div>
                       </div>
 
-                      {/* Achievements */}
-                      <div className="bg-purple-50 rounded-xl p-6 border">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center space-x-2">
-                          <Trophy className="w-5 h-5 text-purple-600" />
-                          <span>Pencapaian</span>
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {[
-                            {
-                              icon: Crown,
-                              title: "Top Performer",
-                              description: "Rating di atas 80.0",
-                              achieved: (performance?.averageRating || 0) >= 80,
-                            },
-                            {
-                              icon: Shield,
-                              title: "Konsisten",
-                              description: "Feedback positif stabil",
-                              achieved: (performance?.totalFeedback || 0) >= 10,
-                            },
-                            {
-                              icon: Diamond,
-                              title: "Excellent",
-                              description: "Rating sempurna 95.0+",
-                              achieved: (performance?.averageRating || 0) >= 95,
-                            },
-                          ].map((achievement, index) => (
-                            <div
-                              key={index}
-                              className={`p-4 rounded-lg border ${
-                                achievement.achieved
-                                  ? "bg-green-50 border-green-200"
-                                  : "bg-gray-50 border-gray-200"
-                              }`}
-                            >
-                              <div className="flex items-center space-x-3">
-                                <div
-                                  className={`p-2 rounded-lg ${
-                                    achievement.achieved
-                                      ? "bg-green-500"
-                                      : "bg-gray-400"
-                                  }`}
-                                >
-                                  <achievement.icon className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                  <h4 className="font-medium text-gray-900">
-                                    {achievement.title}
-                                  </h4>
-                                  <p className="text-sm text-gray-600">
-                                    {achievement.description}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      {/* Achievements section removed as requested */}
                     </div>
                   )}
 
@@ -639,39 +577,7 @@ export default function PublicProfilePage() {
                         </div>
                       </div>
 
-                      {/* Insight */}
-                      <div className="bg-purple-50 rounded-xl p-6 border">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Insight Performa
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="bg-white rounded-lg p-4 border">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <TrendingUp className="w-4 h-4 text-green-600" />
-                              <span className="font-medium text-green-800">
-                                Trend Positif
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-700">
-                              Performa menunjukkan tren yang konsisten dengan
-                              peningkatan bertahap.
-                            </p>
-                          </div>
-                          <div className="bg-white rounded-lg p-4 border">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Target className="w-4 h-4 text-blue-600" />
-                              <span className="font-medium text-blue-800">
-                                Target Tercapai
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-700">
-                              Sudah mencapai{" "}
-                              {Math.round(performance?.periodProgress || 0)}%
-                              dari target periode ini.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                      {/* Insight section removed as requested */}
                     </div>
                   )}
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/store/useStore";
 import { TeamService } from "@/lib/team-service";
 import { SupervisorService } from "@/lib/supervisor-service";
@@ -539,7 +540,14 @@ function SupervisorTeamView() {
 
 export default function TeamPage() {
   const { user } = useStore();
-  const { isSupervisor, isLoading } = useUserRole();
+  const { isSupervisor, isLoading, isAdmin } = useUserRole();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isAdmin) {
+      router.replace("/admin");
+    }
+  }, [isAdmin, router]);
 
   if (isLoading || !user) {
     return (

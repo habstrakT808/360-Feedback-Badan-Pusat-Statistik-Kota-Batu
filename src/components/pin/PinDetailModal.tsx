@@ -15,9 +15,8 @@ interface PinDetailModalProps {
     pin_count: number;
     rank: number;
   };
-  periodType: "weekly" | "monthly";
+  periodType: "monthly";
   periodInfo: {
-    weekNumber?: number;
     year: number;
     month?: number;
   };
@@ -76,35 +75,11 @@ export function PinDetailModal({
         return;
       }
 
-      // Filter berdasarkan period
-      let filteredPins = pins;
-      if (periodType === "weekly") {
-        console.log("🔍 Filtering for weekly:", {
-          weekNumber: periodInfo.weekNumber,
-          year: periodInfo.year,
-        });
-        console.log(
-          "🔍 Available pins week numbers:",
-          pins.map((p) => ({ week: p.week_number, year: p.year }))
-        );
-
-        filteredPins = pins.filter(
-          (pin) =>
-            pin.week_number === periodInfo.weekNumber &&
-            pin.year === periodInfo.year
-        );
-        console.log("🔍 Filtered weekly pins:", filteredPins);
-      } else if (periodType === "monthly") {
-        console.log("🔍 Filtering for monthly:", {
-          month: periodInfo.month,
-          year: periodInfo.year,
-        });
-        filteredPins = pins.filter(
-          (pin) =>
-            pin.month === periodInfo.month && pin.year === periodInfo.year
-        );
-        console.log("🔍 Filtered monthly pins:", filteredPins);
-      }
+      // Filter berdasarkan periode bulanan saja
+      const filteredPins = pins.filter(
+        (pin) => pin.month === periodInfo.month && pin.year === periodInfo.year
+      );
+      console.log("🔍 Filtered monthly pins:", filteredPins);
 
       console.log("🔍 Final filtered pins:", filteredPins);
 
@@ -171,25 +146,21 @@ export function PinDetailModal({
   };
 
   const getPeriodTitle = () => {
-    if (periodType === "weekly") {
-      return `Minggu ${periodInfo.weekNumber}, ${periodInfo.year}`;
-    } else {
-      const months = [
-        "Januari",
-        "Februari",
-        "Maret",
-        "April",
-        "Mei",
-        "Juni",
-        "Juli",
-        "Agustus",
-        "September",
-        "Oktober",
-        "November",
-        "Desember",
-      ];
-      return `${months[(periodInfo.month || 1) - 1]} ${periodInfo.year}`;
-    }
+    const months = [
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
+    ];
+    return `${months[(periodInfo.month || 1) - 1]} ${periodInfo.year}`;
   };
 
   const getRankBadge = (rank: number) => {
@@ -280,17 +251,11 @@ export function PinDetailModal({
             <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border-b border-gray-200">
               <div className="flex items-center justify-center space-x-3">
                 <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
-                  {periodType === "weekly" ? (
-                    <Calendar className="w-5 h-5 text-white" />
-                  ) : (
-                    <Star className="w-5 h-5 text-white" />
-                  )}
+                  <Star className="w-5 h-5 text-white" />
                 </div>
                 <div className="text-center">
                   <h3 className="font-semibold text-gray-800">
-                    {periodType === "weekly"
-                      ? "Peringkat Mingguan"
-                      : "Peringkat Bulanan"}
+                    Peringkat Bulanan
                   </h3>
                   <p className="text-gray-600 text-sm">{getPeriodTitle()}</p>
                 </div>

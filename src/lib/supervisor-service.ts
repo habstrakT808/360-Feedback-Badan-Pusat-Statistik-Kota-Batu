@@ -433,4 +433,21 @@ export class SupervisorService {
 
     return responses || []
   }
+
+  // Get set of assessee IDs already assessed by current supervisor for a period
+  static async getAssessedUserIds(periodId: string) {
+    const currentUser = await supabase.auth.getUser()
+    if (!currentUser.data.user) return new Set<string>()
+
+    const { data, error } = await supabase
+      .from('assessment_assignments')
+      .select('assessee_id')
+      .eq('assessor_id', currentUser.data.user.id)
+      .eq('period_id', periodId)
+      .eq('is_completed', true)
+
+    if (error) return new Set<string>()
+
+    return new Set<string>((data || []).map((row: any) => row.assessee_id))
+  }
 }

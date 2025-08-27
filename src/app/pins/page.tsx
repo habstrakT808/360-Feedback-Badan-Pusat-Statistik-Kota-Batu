@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/store/useStore";
 import { PinService, PinRanking } from "@/lib/pin-service";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -12,9 +13,9 @@ import { PinHistory } from "@/components/pin/PinHistory";
 import { EmployeeCard } from "@/components/pin/EmployeeCard";
 import { PinDetailModal } from "@/components/pin/PinDetailModal";
 import { toast } from "react-hot-toast";
+import { PinPeriodService } from "@/lib/pin-period-service";
 import {
   Pin,
-  Trophy,
   Calendar,
   Users,
   Award,
@@ -27,17 +28,24 @@ import {
 export default function PinsPage() {
   const { user } = useStore();
   const { isAdmin, isSupervisor, isLoading: roleLoading } = useUserRole();
-  const [weeklyRanking, setWeeklyRanking] = useState<PinRanking[]>([]);
+  const router = useRouter();
   const [monthlyRanking, setMonthlyRanking] = useState<PinRanking[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pinsRemaining, setPinsRemaining] = useState(4);
   const [isGivingPin, setIsGivingPin] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    "give" | "weekly" | "monthly" | "history"
-  >("give");
+  const [activeTab, setActiveTab] = useState<"give" | "monthly" | "history">(
+    "give"
+  );
   const [selectedUser, setSelectedUser] = useState<PinRanking | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activePinPeriod, setActivePinPeriod] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (isAdmin) {
+      router.replace("/admin");
+    }
+  }, [isAdmin, router]);
 
   useEffect(() => {
     if (user?.id) {
@@ -52,19 +60,15 @@ export default function PinsPage() {
       // Hapus pemanggilan createTestPins yang sudah dinonaktifkan
       // await PinService.createTestPins(user!.id);
 
-      const [weekly, monthly, allowance, members] = await Promise.all([
-        PinService.getWeeklyRanking(),
+      const [monthly, allowance, members, pinPeriod] = await Promise.all([
         PinService.getMonthlyRanking(),
-        PinService.getWeeklyPinAllowance(user!.id),
+        PinService.getMonthlyPinAllowance(user!.id),
         PinService.getAvailableTeamMembers(user!.id),
+        PinPeriodService.getActive(),
       ]);
 
       // Debug: Log semua user ID untuk mengidentifikasi duplikat
       console.log("=== DEBUG: User IDs ===");
-      console.log(
-        "Weekly Ranking IDs:",
-        weekly.map((u) => u.user_id)
-      );
       console.log(
         "Monthly Ranking IDs:",
         monthly.map((u) => u.user_id)
@@ -75,10 +79,10 @@ export default function PinsPage() {
       );
       console.log("========================");
 
-      setWeeklyRanking(weekly);
       setMonthlyRanking(monthly);
       setTeamMembers(members);
       setPinsRemaining(allowance?.pins_remaining || 0);
+      setActivePinPeriod(pinPeriod);
     } catch (error: any) {
       console.error("Error loading pin data:", error);
       toast.error("Gagal memuat data pin: " + error.message);
@@ -119,6 +123,12 @@ export default function PinsPage() {
   const currentWeek = PinService.getCurrentWeekNumber();
   const currentYear = PinService.getCurrentYear();
   const currentMonth = PinService.getCurrentMonth();
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isWithinActivePinPeriod = !!(
+    activePinPeriod &&
+    todayStr >= activePinPeriod.start_date &&
+    todayStr <= activePinPeriod.end_date
+  );
 
   const getMonthName = (month: number) => {
     const months = [
@@ -163,7 +173,7 @@ export default function PinsPage() {
             </div>
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">
-                Sistem Pin
+                Employee of the Month
               </h1>
               <p className="text-gray-600 text-lg">
                 Berikan pin kepada rekan kerja yang membantu Anda
@@ -187,7 +197,7 @@ export default function PinsPage() {
                 <h3 className="text-lg font-semibold">Pin Tersisa</h3>
               </div>
               <div className="text-3xl font-bold mb-2">{pinsRemaining}</div>
-              <p className="text-blue-100 text-sm">dari 4 pin mingguan</p>
+              <p className="text-blue-100 text-sm">dari 4 pin bulanan</p>
             </div>
 
             {/* Current Period */}
@@ -207,7 +217,7 @@ export default function PinsPage() {
             {/* Status */}
             <div
               className={`rounded-2xl p-6 text-white ${
-                isFriday
+                isWithinActivePinPeriod
                   ? "bg-gradient-to-r from-green-500 to-emerald-600"
                   : "bg-gradient-to-r from-gray-500 to-gray-600"
               }`}
@@ -217,39 +227,36 @@ export default function PinsPage() {
                 <h3 className="text-lg font-semibold">Status</h3>
               </div>
               <div className="text-lg font-semibold mb-2">
-                {isFriday ? "Pin Dapat Diberikan" : "Pin Tidak Dapat Diberikan"}
+                {isWithinActivePinPeriod
+                  ? "Pin Dapat Diberikan"
+                  : "Pin Tidak Dapat Diberikan"}
               </div>
               <p className="text-sm opacity-90">
-                {isFriday
-                  ? process.env.NODE_ENV === "development" ||
-                    process.env.NEXT_PUBLIC_ENABLE_PIN_TESTING === "true"
-                    ? "Developer mode aktif - testing tanpa batasan"
-                    : "Pin dapat diberikan hari ini!"
-                  : "Pin hanya dapat diberikan pada hari Jumat"}
+                {isWithinActivePinPeriod
+                  ? "Periode pin sedang aktif. Anda dapat memberikan pin."
+                  : "Periode pin belum dimulai atau telah berakhir."}
               </p>
             </div>
           </div>
         </motion.div>
 
-        {/* Developer Mode Info */}
-        {(process.env.NODE_ENV === "development" ||
-          process.env.NEXT_PUBLIC_ENABLE_PIN_TESTING === "true") && (
+        {/* Warning if pin period not started */}
+        {!isWithinActivePinPeriod && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="mb-8 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl"
+            className="mb-8 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl"
           >
             <div className="flex items-center space-x-3">
-              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">DEV</span>
+              <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                !
               </div>
               <div>
-                <h4 className="font-semibold text-green-800">
-                  🧪 Developer Mode Aktif
+                <h4 className="font-semibold text-yellow-800">
+                  Periode pin belum dimulai
                 </h4>
-                <p className="text-green-700 text-sm">
-                  Sistem pin dapat diakses untuk testing tanpa batasan hari
-                  Jumat. Fitur ini hanya tersedia dalam mode development.
+                <p className="text-yellow-700 text-sm">
+                  Silakan tunggu hingga periode aktif dimulai oleh admin.
                 </p>
               </div>
             </div>
@@ -290,8 +297,7 @@ export default function PinsPage() {
           <div className="flex space-x-1 bg-gray-100 p-1 rounded-2xl">
             {[
               { id: "give", label: "Berikan Pin", icon: Pin },
-              { id: "weekly", label: "Peringkat Mingguan", icon: Calendar },
-              { id: "monthly", label: "Peringkat Bulanan", icon: Trophy },
+              { id: "monthly", label: "Peringkat Bulanan", icon: Award },
               { id: "history", label: "Riwayat Pin", icon: Clock },
             ].map((tab) => {
               const Icon = tab.icon;
@@ -357,7 +363,11 @@ export default function PinsPage() {
                       key={`member-${member.id}-${index}`} // Gunakan kombinasi ID dan index
                       employee={member}
                       onGivePin={handleGivePin}
-                      canGivePin={isFriday && pinsRemaining > 0}
+                      canGivePin={
+                        isWithinActivePinPeriod &&
+                        pinsRemaining > 0 &&
+                        !isGivingPin
+                      }
                       isGivingPin={isGivingPin}
                       isCurrentUser={member.id === user?.id}
                     />
@@ -367,57 +377,7 @@ export default function PinsPage() {
             </div>
           )}
 
-          {/* Weekly Ranking */}
-          {activeTab === "weekly" && (
-            <div>
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="p-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl">
-                  <Trophy className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    The Most Helpful Employee of the Week
-                  </h2>
-                  <p className="text-gray-600">
-                    Peringkat minggu {currentWeek}, {currentYear}
-                  </p>
-                </div>
-              </div>
-
-              {weeklyRanking.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl shadow-lg border border-gray-100">
-                  <Pin className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-500 mb-2">
-                    Belum ada pin yang diberikan minggu ini
-                  </h3>
-                  <p className="text-gray-400">
-                    {isFriday
-                      ? "Mulai berikan pin kepada rekan kerja Anda"
-                      : "Mulai berikan pin kepada rekan kerja Anda pada hari Jumat"}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {weeklyRanking.map((rankingUser, index) => (
-                    <PinCard
-                      key={`weekly-${rankingUser.user_id}-${index}`} // Gunakan kombinasi ID dan index
-                      user={rankingUser}
-                      onGivePin={handleGivePin}
-                      canGivePin={isFriday && pinsRemaining > 0 && !isGivingPin}
-                      pinsRemaining={pinsRemaining}
-                      isCurrentUser={rankingUser.user_id === user?.id}
-                      onCardClick={handleCardClick}
-                      periodType="weekly"
-                      periodInfo={{
-                        weekNumber: currentWeek,
-                        year: currentYear,
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Weekly ranking removed */}
 
           {/* Monthly Ranking */}
           {activeTab === "monthly" && (
@@ -447,23 +407,141 @@ export default function PinsPage() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {monthlyRanking.map((rankingUser, index) => (
-                    <PinCard
-                      key={`monthly-${rankingUser.user_id}-${index}`} // Gunakan kombinasi ID dan index
-                      user={rankingUser}
-                      onGivePin={handleGivePin}
-                      canGivePin={isFriday && pinsRemaining > 0 && !isGivingPin}
-                      pinsRemaining={pinsRemaining}
-                      isCurrentUser={rankingUser.user_id === user?.id}
-                      onCardClick={handleCardClick}
-                      periodType="monthly"
-                      periodInfo={{
-                        month: currentMonth,
-                        year: currentYear,
-                      }}
-                    />
-                  ))}
+                <div>
+                  {(() => {
+                    const topFive = monthlyRanking.slice(0, 5);
+                    const [first, second, third, fourth, fifth] = topFive;
+                    return (
+                      <>
+                        {/* Podium Top 3 */}
+                        <div className="grid grid-cols-3 gap-4 mb-8">
+                          {/* Rank 2 */}
+                          <div className="flex flex-col items-center justify-end">
+                            {second && (
+                              <div
+                                onClick={() => handleCardClick(second)}
+                                className="cursor-pointer w-full max-w-[220px]"
+                              >
+                                <div className="flex flex-col items-center">
+                                  <img
+                                    src={second.avatar_url || "/logo-bps.png"}
+                                    alt={second.full_name}
+                                    className="w-20 h-20 rounded-full object-cover border-4 border-gray-300 shadow"
+                                  />
+                                  <div className="mt-2 text-sm font-semibold text-gray-800 text-center line-clamp-2">
+                                    {second.full_name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {second.pin_count} pin
+                                  </div>
+                                </div>
+                                <div className="mt-3 h-28 w-full bg-gray-200 rounded-xl flex items-end justify-center relative">
+                                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-300 text-gray-700 text-xs font-bold px-3 py-1 rounded-full">
+                                    #2
+                                  </div>
+                                  <div className="w-full text-center text-xs text-gray-600 pb-2">
+                                    Runner Up
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {/* Rank 1 */}
+                          <div className="flex flex-col items-center justify-end">
+                            {first && (
+                              <div
+                                onClick={() => handleCardClick(first)}
+                                className="cursor-pointer w-full max-w-[240px]"
+                              >
+                                <div className="flex flex-col items-center">
+                                  <img
+                                    src={first.avatar_url || "/logo-bps.png"}
+                                    alt={first.full_name}
+                                    className="w-24 h-24 rounded-full object-cover border-4 border-yellow-400 shadow"
+                                  />
+                                  <div className="mt-2 text-base font-bold text-gray-900 text-center line-clamp-2">
+                                    {first.full_name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {first.pin_count} pin
+                                  </div>
+                                </div>
+                                <div className="mt-3 h-36 w-full bg-yellow-200 rounded-xl flex items-end justify-center relative">
+                                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-full">
+                                    #1
+                                  </div>
+                                  <div className="w-full text-center text-xs text-yellow-800 pb-2">
+                                    Champion
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {/* Rank 3 */}
+                          <div className="flex flex-col items-center justify-end">
+                            {third && (
+                              <div
+                                onClick={() => handleCardClick(third)}
+                                className="cursor-pointer w-full max-w-[220px]"
+                              >
+                                <div className="flex flex-col items-center">
+                                  <img
+                                    src={third.avatar_url || "/logo-bps.png"}
+                                    alt={third.full_name}
+                                    className="w-20 h-20 rounded-full object-cover border-4 border-amber-600 shadow"
+                                  />
+                                  <div className="mt-2 text-sm font-semibold text-gray-800 text-center line-clamp-2">
+                                    {third.full_name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {third.pin_count} pin
+                                  </div>
+                                </div>
+                                <div className="mt-3 h-24 w-full bg-amber-200 rounded-xl flex items-end justify-center relative">
+                                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-900 text-xs font-bold px-3 py-1 rounded-full">
+                                    #3
+                                  </div>
+                                  <div className="w-full text-center text-xs text-amber-800 pb-2">
+                                    Third
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Rank 4-5 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {[fourth, fifth].filter(Boolean).map((u, idx) => (
+                            <div
+                              key={`top5-${(u as any).user_id}`}
+                              onClick={() => handleCardClick(u as any)}
+                              className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between hover:shadow-md transition cursor-pointer"
+                            >
+                              <div className="flex items-center space-x-3">
+                                <img
+                                  src={(u as any).avatar_url || "/logo-bps.png"}
+                                  alt={(u as any).full_name}
+                                  className="w-12 h-12 rounded-full object-cover"
+                                />
+                                <div>
+                                  <div className="font-semibold text-gray-900 line-clamp-1">
+                                    {(u as any).full_name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {(u as any).pin_count} pin
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">
+                                #{idx + 4}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -472,43 +550,9 @@ export default function PinsPage() {
           {/* Pin History */}
           {activeTab === "history" && (
             <div>
-              <PinHistory />
+              <PinHistory onAfterCancel={loadData} />
             </div>
           )}
-        </motion.div>
-
-        {/* Footer Info */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="mt-12 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl border border-blue-200"
-        >
-          <div className="text-center">
-            <h3 className="text-lg font-semibold text-blue-800 mb-3">
-              Cara Kerja Sistem Pin
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm text-blue-700">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                  1
-                </div>
-                <span>Setiap user mendapat 4 pin per minggu</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                  2
-                </div>
-                <span>Pin hanya dapat diberikan pada hari Jumat</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                  3
-                </div>
-                <span>Peringkat di-reset setiap minggu dan bulan</span>
-              </div>
-            </div>
-          </div>
         </motion.div>
       </div>
 
@@ -518,12 +562,8 @@ export default function PinsPage() {
           isOpen={isModalOpen}
           onClose={closeModal}
           user={selectedUser}
-          periodType={activeTab === "weekly" ? "weekly" : "monthly"}
-          periodInfo={
-            activeTab === "weekly"
-              ? { weekNumber: 35, year: currentYear } // Gunakan week 35 yang sudah diupdate di database
-              : { month: currentMonth, year: currentYear }
-          }
+          periodType="monthly"
+          periodInfo={{ month: currentMonth, year: currentYear }}
         />
       )}
     </DashboardLayout>

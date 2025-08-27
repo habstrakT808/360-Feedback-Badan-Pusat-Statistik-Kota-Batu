@@ -1,10 +1,12 @@
 // src/app/assessment/page.tsx (REPLACE COMPLETE FILE)
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useStore } from "@/store/useStore";
 import { useUserRole } from "@/hooks/useUserRole";
 import { AssessmentService } from "@/lib/assessment-service";
+import { DraftService } from "@/lib/draft-service";
 import { SupervisorService } from "@/lib/supervisor-service";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Loading } from "@/components/ui/Loading";
@@ -115,45 +117,76 @@ function RegularUserAssessment() {
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {assignments.map((assignment, index) => (
-            <motion.div
-              key={assignment.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 cursor-pointer"
-              onClick={() =>
-                (window.location.href = `/assessment/${assignment.id}`)
-              }
-            >
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-white font-bold text-xl">
-                    {assignment.assessee?.full_name?.charAt(0) ||
-                      assignment.assessee?.email?.charAt(0)}
+          {assignments.map((assignment, index) => {
+            const isCompleted = Boolean(assignment.is_completed);
+            const draftKey = user
+              ? `draft:regular:${user.id}:${assignment.id}`
+              : "";
+            const hasDraft = !!DraftService.get(draftKey);
+            const statusLabel = isCompleted
+              ? "Selesai"
+              : hasDraft
+              ? "Draft"
+              : "Belum Dinilai";
+            const statusColor = isCompleted
+              ? "bg-green-100 text-green-700 border-green-200"
+              : hasDraft
+              ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+              : "bg-blue-100 text-blue-700 border-blue-200";
+            return (
+              <motion.div
+                key={assignment.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -4, scale: 1.02 }}
+                className={
+                  "bg-white rounded-2xl p-6 shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl cursor-pointer"
+                }
+                onClick={() => {
+                  window.location.href = `/assessment/${assignment.id}`;
+                }}
+              >
+                <div className="text-center relative">
+                  <span
+                    className={`absolute top-0 right-0 -mt-2 mr-0 px-3 py-1 text-xs font-semibold rounded-full border ${statusColor}`}
+                  >
+                    {statusLabel}
                   </span>
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-white font-bold text-xl">
+                      {assignment.assessee?.full_name?.charAt(0) ||
+                        assignment.assessee?.email?.charAt(0)}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {assignment.assessee?.full_name ||
+                      assignment.assessee?.email}
+                  </h3>
+                  {assignment.assessee?.position && (
+                    <p className="text-gray-600 mb-1">
+                      {assignment.assessee.position}
+                    </p>
+                  )}
+                  {assignment.assessee?.department && (
+                    <p className="text-gray-500 text-sm">
+                      {assignment.assessee.department}
+                    </p>
+                  )}
+                  <div
+                    className={`mt-4 flex items-center justify-center space-x-2 ${
+                      isCompleted ? "text-green-700" : "text-blue-600"
+                    }`}
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {isCompleted ? "Edit Penilaian" : "Beri Penilaian"}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  {assignment.assessee?.full_name || assignment.assessee?.email}
-                </h3>
-                {assignment.assessee?.position && (
-                  <p className="text-gray-600 mb-1">
-                    {assignment.assessee.position}
-                  </p>
-                )}
-                {assignment.assessee?.department && (
-                  <p className="text-gray-500 text-sm">
-                    {assignment.assessee.department}
-                  </p>
-                )}
-                <div className="mt-4 flex items-center justify-center space-x-2 text-blue-600">
-                  <BarChart3 className="w-4 h-4" />
-                  <span className="text-sm font-medium">Beri Penilaian</span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -165,6 +198,8 @@ function SupervisorAssessment() {
   const [users, setUsers] = useState<any[]>([]);
   const [currentPeriod, setCurrentPeriod] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useStore();
+  const [assessedIds, setAssessedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -179,6 +214,10 @@ function SupervisorAssessment() {
       ]);
       setUsers(usersData);
       setCurrentPeriod(periodData);
+      if (periodData) {
+        const ids = await SupervisorService.getAssessedUserIds(periodData.id);
+        setAssessedIds(ids);
+      }
     } catch (error: any) {
       console.error("Error loading data:", error);
       toast.error("Gagal memuat data: " + error.message);
@@ -258,40 +297,69 @@ function SupervisorAssessment() {
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {users.map((user, index) => (
-            <motion.div
-              key={user.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 cursor-pointer"
-              onClick={() =>
-                (window.location.href = `/assessment/supervisor/${user.id}`)
-              }
-            >
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-white font-bold text-xl">
-                    {user.full_name?.charAt(0) || user.email?.charAt(0)}
+          {users.map((u, index) => {
+            const draftKey =
+              user && currentPeriod
+                ? `draft:supervisor:${user.id}:${u.id}:${currentPeriod.id}`
+                : "";
+            const hasDraft = !!DraftService.get(draftKey);
+            const isCompleted = assessedIds.has(u.id);
+            const statusLabel = isCompleted
+              ? "Selesai"
+              : hasDraft
+              ? "Draft"
+              : "Belum Dinilai";
+            const statusColor = isCompleted
+              ? "bg-green-100 text-green-700 border-green-200"
+              : hasDraft
+              ? "bg-yellow-100 text-yellow-700 border-yellow-200"
+              : "bg-purple-100 text-purple-700 border-purple-200";
+            return (
+              <motion.div
+                key={u.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -4, scale: 1.02 }}
+                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 cursor-pointer"
+                onClick={() =>
+                  (window.location.href = `/assessment/supervisor/${u.id}`)
+                }
+              >
+                <div className="text-center relative">
+                  <span
+                    className={`absolute top-0 right-0 -mt-2 mr-0 px-3 py-1 text-xs font-semibold rounded-full border ${statusColor}`}
+                  >
+                    {statusLabel}
                   </span>
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-white font-bold text-xl">
+                      {u.full_name?.charAt(0) || u.email?.charAt(0)}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {u.full_name || u.email}
+                  </h3>
+                  {u.position && (
+                    <p className="text-gray-600 mb-1">{u.position}</p>
+                  )}
+                  {u.department && (
+                    <p className="text-gray-500 text-sm">{u.department}</p>
+                  )}
+                  <div
+                    className={`mt-4 flex items-center justify-center space-x-2 ${
+                      isCompleted ? "text-green-700" : "text-purple-600"
+                    }`}
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {isCompleted ? "Edit Penilaian" : "Beri Penilaian"}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  {user.full_name || user.email}
-                </h3>
-                {user.position && (
-                  <p className="text-gray-600 mb-1">{user.position}</p>
-                )}
-                {user.department && (
-                  <p className="text-gray-500 text-sm">{user.department}</p>
-                )}
-                <div className="mt-4 flex items-center justify-center space-x-2 text-purple-600">
-                  <BarChart3 className="w-4 h-4" />
-                  <span className="text-sm font-medium">Beri Penilaian</span>
-                </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -300,7 +368,14 @@ function SupervisorAssessment() {
 
 export default function AssessmentPage() {
   const { user } = useStore();
-  const { isSupervisor, isLoading } = useUserRole();
+  const router = useRouter();
+  const { isSupervisor, isLoading, isAdmin } = useUserRole();
+
+  useEffect(() => {
+    if (isAdmin) {
+      router.replace("/admin");
+    }
+  }, [isAdmin, router]);
 
   if (isLoading || !user) {
     return (

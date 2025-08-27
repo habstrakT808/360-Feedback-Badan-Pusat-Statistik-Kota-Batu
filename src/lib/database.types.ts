@@ -495,6 +495,39 @@ export type Database = {
           },
         ]
       }
+      pin_periods: {
+        Row: {
+          id: string
+          month: number | null
+          year: number | null
+          start_date: string
+          end_date: string
+          is_active: boolean | null
+          is_completed: boolean | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          month?: number | null
+          year?: number | null
+          start_date: string
+          end_date: string
+          is_active?: boolean | null
+          is_completed?: boolean | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          month?: number | null
+          year?: number | null
+          start_date?: string
+          end_date?: string
+          is_active?: boolean | null
+          is_completed?: boolean | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       weekly_pin_allowance: {
         Row: {
           id: string
@@ -526,6 +559,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "weekly_pin_allowance_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_pin_allowance: {
+        Row: {
+          id: string
+          user_id: string
+          month: number
+          year: number
+          pins_remaining: number
+          pins_used: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          month: number
+          year: number
+          pins_remaining?: number
+          pins_used?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          month?: number
+          year?: number
+          pins_remaining?: number
+          pins_used?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_pin_allowance_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

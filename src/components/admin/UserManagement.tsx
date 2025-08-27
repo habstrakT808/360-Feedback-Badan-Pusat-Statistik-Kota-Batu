@@ -35,6 +35,8 @@ export function UserManagement({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
 
   useEffect(() => {
     loadUsers();
@@ -58,6 +60,15 @@ export function UserManagement({
       user.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.department?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const startIndex = (page - 1) * pageSize;
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + pageSize);
 
   const handleDeleteUser = async (userId: string) => {
     if (
@@ -220,7 +231,7 @@ export function UserManagement({
 
       {/* Users List */}
       <div className="divide-y divide-gray-200">
-        {filteredUsers.map((user, index) => (
+        {paginatedUsers.map((user, index) => (
           <motion.div
             key={user.id}
             initial={{ opacity: 0, y: 20 }}
@@ -322,6 +333,44 @@ export function UserManagement({
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {filteredUsers.length > 0 && (
+        <div className="p-4 border-t border-gray-200 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Showing {startIndex + 1}-
+            {Math.min(startIndex + pageSize, filteredUsers.length)} of{" "}
+            {filteredUsers.length}
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className={`px-3 py-2 rounded-lg border text-sm ${
+                page === 1
+                  ? "text-gray-300 border-gray-200 cursor-not-allowed"
+                  : "text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              Prev
+            </button>
+            <div className="text-sm text-gray-700">
+              Page {page} of {totalPages}
+            </div>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className={`px-3 py-2 rounded-lg border text-sm ${
+                page === totalPages
+                  ? "text-gray-300 border-gray-200 cursor-not-allowed"
+                  : "text-gray-700 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

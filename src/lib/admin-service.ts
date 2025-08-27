@@ -1,5 +1,6 @@
 // src/lib/admin-service.ts
 import { supabase } from '@/lib/supabase'
+import { RolesService } from '@/lib/roles-service'
 import { Database } from '@/lib/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -230,54 +231,82 @@ export class AdminService {
   // Analytics & Reports
   static async getSystemStats() {
     try {
-      // Get admin users to exclude them from stats
-      const { data: adminUsers, error: adminError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'admin')
+      // Get role user IDs (with env overrides)
+      const { adminIds, supervisorIds } = await RolesService.getRoleUserIds()
 
-      const adminUserIds = adminError ? [] : (adminUsers?.map(u => u.user_id) || [])
+      // Active period
+      const { data: activePeriod, error: periodError } = await supabase
+        .from('assessment_periods')
+        .select('*')
+        .eq('is_active', true)
+        .maybeSingle()
 
-      const [
-        { count: totalUsers },
-        { count: totalPeriods },
-        { count: totalAssignments },
-        { count: completedAssignments }
-      ] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('assessment_periods').select('*', { count: 'exact', head: true }),
-        supabase.from('assessment_assignments').select('*', { count: 'exact', head: true }),
-        supabase.from('assessment_assignments').select('*', { count: 'exact', head: true }).eq('is_completed', true)
-      ])
-
-      // Filter assignments to exclude admin users
-      const { data: allAssignments, error: assignmentsError } = await supabase
-        .from('assessment_assignments')
-        .select('assessor_id, assessee_id, is_completed')
-
-      if (assignmentsError) {
-        console.error('Error fetching assignments for filtering:', assignmentsError)
+      if (periodError) {
+        console.error('Error fetching active period:', periodError)
       }
 
-      const filteredAssignments = allAssignments?.filter(assignment => 
-        !adminUserIds.includes(assignment.assessor_id) && 
-        !adminUserIds.includes(assignment.assessee_id)
-      ) || []
+      // Total users excluding admins and supervisors (eligible peer assessors)
+      const { data: allProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id')
 
-      const actualTotalAssignments = filteredAssignments.length
-      const actualCompletedAssignments = filteredAssignments.filter(a => a.is_completed).length
-      const actualPendingAssignments = actualTotalAssignments - actualCompletedAssignments
-      const actualTotalUsers = (totalUsers || 0) - adminUserIds.length
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError)
+      }
 
-      const completionRate = actualTotalAssignments > 0 ? (actualCompletedAssignments / actualTotalAssignments) * 100 : 0
+      const eligibleUserIds = (allProfiles || [])
+        .map(p => p.id)
+        .filter(id => id && !adminIds.includes(id) && !supervisorIds.includes(id))
+
+      const totalEligibleUsers = eligibleUserIds.length
+
+      // Fetch assignments for the active period only
+      const { data: periodAssignments, error: paError } = await supabase
+        .from('assessment_assignments')
+        .select('assessor_id, assessee_id, is_completed, period_id')
+        .eq('period_id', activePeriod?.id || '')
+
+      if (paError) {
+        console.error('Error fetching period assignments:', paError)
+      }
+
+      // Keep only peer assignments: assessor is eligible (non-admin, non-supervisor) and assessee not admin
+      const peerAssignments = (periodAssignments || []).filter(a =>
+        !!a.assessor_id &&
+        !!a.assessee_id &&
+        !adminIds.includes(a.assessor_id) &&
+        !supervisorIds.includes(a.assessor_id) &&
+        !adminIds.includes(a.assessee_id)
+      )
+
+      // Build completion count per assessor
+      const assessorToCompletedCount = new Map<string, number>()
+      for (const a of peerAssignments) {
+        if (a.is_completed) {
+          const prev = assessorToCompletedCount.get(a.assessor_id) || 0
+          assessorToCompletedCount.set(a.assessor_id, prev + 1)
+        }
+      }
+
+      // Users who completed all 5 peer assessments
+      const usersCompletedAllFive = eligibleUserIds.filter(uid =>
+        (assessorToCompletedCount.get(uid) || 0) >= 5
+      ).length
+
+      const pendingUsers = Math.max(0, totalEligibleUsers - usersCompletedAllFive)
+      const completionRate = totalEligibleUsers > 0 ? Math.round((usersCompletedAllFive / totalEligibleUsers) * 100) : 0
+
+      // Keep other basic counts for display
+      const { count: totalUsers } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
+      const { count: totalPeriods } = await supabase.from('assessment_periods').select('*', { count: 'exact', head: true })
 
       return {
-        totalUsers: actualTotalUsers,
+        totalUsers: (totalUsers || 0) - (adminIds.length),
         totalPeriods,
-        totalAssignments: actualTotalAssignments,
-        completedAssignments: actualCompletedAssignments,
-        pendingAssignments: actualPendingAssignments,
-        completionRate: Math.round(completionRate)
+        totalAssignments: totalEligibleUsers, // denominator for Completed Assessments card
+        completedAssignments: usersCompletedAllFive, // numerator for Completed Assessments card
+        pendingAssignments: pendingUsers,
+        completionRate
       }
     } catch (error) {
       console.error('Error getting system stats:', error)

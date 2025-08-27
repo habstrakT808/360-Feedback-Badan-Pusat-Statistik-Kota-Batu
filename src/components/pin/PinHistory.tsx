@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, Calendar, User, Clock } from "lucide-react";
+import { Pin, Calendar, User, Clock, XCircle } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { PinService } from "@/lib/pin-service";
 import { useStore } from "@/store/useStore";
@@ -19,9 +19,14 @@ interface PinHistoryItem {
   year: number;
 }
 
-export function PinHistory() {
+interface PinHistoryProps {
+  onAfterCancel?: () => void;
+}
+
+export function PinHistory({ onAfterCancel }: PinHistoryProps) {
   const [pinHistory, setPinHistory] = useState<PinHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const { user } = useStore();
@@ -45,6 +50,22 @@ export function PinHistory() {
       console.error("Error loading pin history:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCancel = async (pinId: string) => {
+    if (!user?.id) return;
+    if (!confirm("Batalkan pin ini?")) return;
+    try {
+      setIsCancelling(pinId);
+      await PinService.cancelPin(pinId, user.id);
+      await loadPinHistory();
+      onAfterCancel && onAfterCancel();
+    } catch (e: any) {
+      console.error(e);
+      alert(e.message || "Gagal membatalkan pin");
+    } finally {
+      setIsCancelling(null);
     }
   };
 
@@ -223,9 +244,18 @@ export function PinHistory() {
                   </div>
                 </div>
 
-                {/* Pin Icon */}
-                <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center">
-                  <Pin className="w-4 h-4 text-white" />
+                {/* Actions */}
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleCancel(pin.id)}
+                    disabled={isCancelling === pin.id}
+                    className="px-3 py-2 text-sm bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    <span>
+                      {isCancelling === pin.id ? "Membatalkan..." : "Batal"}
+                    </span>
+                  </button>
                 </div>
               </motion.div>
             ))}

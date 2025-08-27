@@ -12,8 +12,8 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
   Pin,
+  ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useUser, useSetUser } from "@/store/useStore";
@@ -23,12 +23,17 @@ import { useUserRole } from "@/hooks/useUserRole";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Beri Penilaian", href: "/assessment", icon: BarChart3 },
+  {
+    name: "Beri Penilaian",
+    icon: BarChart3,
+    children: [
+      { name: "Penilaian 360", href: "/assessment", icon: BarChart3 },
+      { name: "EOTM", href: "/pins", icon: Pin },
+      { name: "Triwulan", href: "/triwulan", icon: Award },
+    ],
+  },
   { name: "Hasil Saya", href: "/my-results", icon: Award },
   { name: "Tim", href: "/team", icon: Users },
-  { name: "Sistem Pin", href: "/pins", icon: Pin },
-  { name: "Notifikasi", href: "/notifications", icon: Bell },
-  { name: "Pengaturan", href: "/settings", icon: Settings },
 ];
 
 // Admin-only navigation items
@@ -36,6 +41,7 @@ const adminNavigation = [{ name: "Admin", href: "/admin", icon: Shield }];
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const user = useUser();
   const setUser = useSetUser();
   const { isAdmin, isSupervisor } = useUserRole();
@@ -101,10 +107,18 @@ export function Navigation() {
     return pathname === href;
   };
 
+  // Open the Beri Penilaian section when on its children routes
+  useEffect(() => {
+    const isAssessment = pathname?.startsWith("/assessment");
+    const isPins = pathname?.startsWith("/pins");
+    const isTriwulan = pathname?.startsWith("/triwulan");
+    if (isAssessment || isPins || isTriwulan) {
+      setOpenMenu("Beri Penilaian");
+    }
+  }, [pathname]);
+
   // Combine navigation based on user role
-  const allNavigation = isAdmin
-    ? [...navigation, ...adminNavigation]
-    : navigation;
+  const allNavigation = isAdmin ? adminNavigation : navigation;
 
   return (
     <>
@@ -193,8 +207,8 @@ export function Navigation() {
                     user?.email}
                 </p>
                 <p className="text-xs text-slate-400 truncate">{user?.email}</p>
-                {/* Role Badge */}
-                <div className="mt-2">
+                {/* Role Badge + Settings */}
+                <div className="mt-2 flex items-center justify-center gap-2">
                   <span
                     className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       isAdmin
@@ -206,6 +220,14 @@ export function Navigation() {
                   >
                     {isAdmin ? "Admin" : isSupervisor ? "Supervisor" : "User"}
                   </span>
+                  <a
+                    href="/settings"
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-full text-slate-300 hover:text-white hover:bg-white/10 transition"
+                    aria-label="Pengaturan"
+                    title="Pengaturan"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </a>
                 </div>
               </div>
             </motion.div>
@@ -214,12 +236,96 @@ export function Navigation() {
           {/* Navigation */}
           <nav className="flex-1 px-6 pb-6 space-y-2 overflow-y-auto custom-scrollbar">
             {allNavigation.map((item, index) => {
-              const isCurrentActive = isActive(item.href);
+              const hasChildren = Array.isArray((item as any).children);
+              if (hasChildren) {
+                const children = (item as any).children as Array<{
+                  name: string;
+                  href: string;
+                  icon: any;
+                }>;
+                const isSectionActive = children.some((c) => isActive(c.href));
+                const isExpanded = openMenu === item.name;
+                return (
+                  <div key={item.name} className="space-y-2">
+                    <motion.button
+                      type="button"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 * index }}
+                      whileHover={{
+                        x: 8,
+                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() =>
+                        setOpenMenu((prev) =>
+                          prev === item.name ? null : (item.name as string)
+                        )
+                      }
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 text-left group ${
+                        isSectionActive || isExpanded
+                          ? "bg-blue-600 text-white shadow-lg"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      <item.icon
+                        className={`w-5 h-5 transition-colors ${
+                          isSectionActive || isExpanded
+                            ? "text-white"
+                            : "group-hover:text-blue-400"
+                        }`}
+                      />
+                      <span className="font-medium flex-1">{item.name}</span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${
+                          isExpanded ? "rotate-180" : "rotate-0"
+                        }`}
+                      />
+                    </motion.button>
 
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="pl-6 space-y-2"
+                        >
+                          {children.map((child, cIndex) => {
+                            const isChildActive = isActive(child.href);
+                            return (
+                              <motion.a
+                                key={child.name}
+                                href={child.href}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.05 * cIndex }}
+                                whileHover={{ x: 8 }}
+                                whileTap={{ scale: 0.98 }}
+                                className={`flex items-center space-x-3 px-4 py-2 rounded-lg transition-all duration-200 ml-2 ${
+                                  isChildActive
+                                    ? "bg-blue-600 text-white shadow"
+                                    : "text-slate-300 hover:text-white hover:bg-white/5"
+                                }`}
+                                onClick={() => setIsOpen(false)}
+                              >
+                                <child.icon className="w-4 h-4" />
+                                <span className="text-sm">{child.name}</span>
+                              </motion.a>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              }
+
+              const isCurrentActive = isActive((item as any).href);
               return (
                 <motion.a
                   key={item.name}
-                  href={item.href}
+                  href={(item as any).href}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 * index }}
@@ -242,9 +348,8 @@ export function Navigation() {
                         : "group-hover:text-blue-400"
                     }`}
                   />
-                  <span className="font-medium">{item.name}</span>
+                  <span className="font-medium">{(item as any).name}</span>
 
-                  {/* Active indicator */}
                   {isCurrentActive && (
                     <motion.div
                       initial={{ scale: 0 }}
