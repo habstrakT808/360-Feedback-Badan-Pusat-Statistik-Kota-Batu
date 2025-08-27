@@ -92,7 +92,7 @@ export function Navigation() {
   }, [user?.id]);
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) {
       toast.error("Gagal logout");
     } else {
