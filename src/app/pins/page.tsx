@@ -22,7 +22,6 @@ import {
   Star,
   TrendingUp,
   Clock,
-  AlertCircle,
 } from "lucide-react";
 
 export default function PinsPage() {
@@ -119,7 +118,6 @@ export default function PinsPage() {
     setSelectedUser(null);
   };
 
-  const isFriday = PinService.isFriday();
   const currentWeek = PinService.getCurrentWeekNumber();
   const currentYear = PinService.getCurrentYear();
   const currentMonth = PinService.getCurrentMonth();
@@ -263,29 +261,7 @@ export default function PinsPage() {
           </motion.div>
         )}
 
-        {/* Warning for Non-Friday (Production Only) */}
-        {!isFriday &&
-          process.env.NODE_ENV === "production" &&
-          process.env.NEXT_PUBLIC_ENABLE_PIN_TESTING !== "true" && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-8 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-2xl"
-            >
-              <div className="flex items-center space-x-3">
-                <AlertCircle className="w-6 h-6 text-yellow-600" />
-                <div>
-                  <h4 className="font-semibold text-yellow-800">
-                    Pin Hanya Dapat Diberikan pada Hari Jumat
-                  </h4>
-                  <p className="text-yellow-700 text-sm">
-                    Sistem pin akan aktif setiap hari Jumat dari jam 00:00
-                    hingga 23:59. Perangkingan akan di-reset setiap hari Sabtu.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          )}
+        {/* Friday-only warning removed per request */}
 
         {/* Navigation Tabs */}
         <motion.div

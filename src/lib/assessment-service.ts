@@ -99,7 +99,7 @@ export class AssessmentService {
             body: JSON.stringify({ periodId: activePeriodId })
           })
           // Re-fetch after generation
-          const { data: retry } = await supabase
+          let retryQuery = supabase
             .from('assessment_assignments')
             .select(`
               *,
@@ -122,8 +122,14 @@ export class AssessmentService {
               )
             `)
             .eq('assessor_id', userId)
-            .eq('period_id', activePeriodId)
-            .order('created_at', { ascending: false })
+
+          if (typeof activePeriodId === 'string') {
+            retryQuery = retryQuery.eq('period_id', activePeriodId)
+          }
+
+          retryQuery = retryQuery.order('created_at', { ascending: false })
+
+          const { data: retry } = await retryQuery
 
           console.log('Assignments after generation:', retry?.length || 0)
           return retry || []
