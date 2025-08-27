@@ -1,14 +1,8 @@
 // src/lib/triwulan-period-service.ts
 import { supabase } from '@/lib/supabase'
-import type { Database } from '@/lib/database.types'
 
-type TriwulanPeriod = Database['public']['Tables']['triwulan_periods'] extends never
-  ? any
-  : Database['public']['Tables']['triwulan_periods']['Row']
-
-type TriwulanMonthlyDef = Database['public']['Tables']['triwulan_monthly_deficiencies'] extends never
-  ? any
-  : Database['public']['Tables']['triwulan_monthly_deficiencies']['Row']
+type TriwulanPeriod = any
+type TriwulanMonthlyDef = any
 
 export class TriwulanPeriodService {
   static async list(): Promise<TriwulanPeriod[]> {

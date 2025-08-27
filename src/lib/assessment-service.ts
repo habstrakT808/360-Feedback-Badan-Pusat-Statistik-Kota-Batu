@@ -51,7 +51,7 @@ export class AssessmentService {
 
       const activePeriodId = active?.id
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('assessment_assignments')
         .select(`
           *,
@@ -75,9 +75,13 @@ export class AssessmentService {
         `)
         .eq('assessor_id', userId)
         // Include both completed and not completed assignments
-        // but only for the current active period
-        .eq('period_id', activePeriodId)
-        .order('created_at', { ascending: false })
+        // but only for the current active period when available
+      if (activePeriodId) {
+        query = query.eq('period_id', activePeriodId)
+      }
+      query = query.order('created_at', { ascending: false })
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching assignments:', error)
