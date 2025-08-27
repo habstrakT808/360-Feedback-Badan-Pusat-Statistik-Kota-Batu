@@ -49,7 +49,9 @@ export class AssessmentService {
         .eq('is_active', true)
         .single()
 
-      const activePeriodId = active?.id
+      // Ensure strong typing: only treat as string when it actually is one
+      const activePeriodId: string | undefined =
+        typeof active?.id === 'string' ? active.id : undefined
 
       let query = supabase
         .from('assessment_assignments')
@@ -76,7 +78,7 @@ export class AssessmentService {
         .eq('assessor_id', userId)
         // Include both completed and not completed assignments
         // but only for the current active period when available
-      if (activePeriodId) {
+      if (typeof activePeriodId === 'string') {
         query = query.eq('period_id', activePeriodId)
       }
       query = query.order('created_at', { ascending: false })
@@ -89,7 +91,7 @@ export class AssessmentService {
       }
 
       // If no assignments for the active period, try to generate (server endpoint bypass RLS)
-      if ((data || []).length === 0 && activePeriodId) {
+      if ((data || []).length === 0 && typeof activePeriodId === 'string') {
         try {
           await fetch('/api/admin/generate-assignments', {
             method: 'POST',
