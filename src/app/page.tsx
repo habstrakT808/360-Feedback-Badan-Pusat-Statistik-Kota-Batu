@@ -304,12 +304,20 @@ export default function HomePage() {
           <button
             key={index}
             onClick={() => setCurrentSection(index)}
-            className={`w-3 h-3 rounded-full transition-all duration-300 ${
+            aria-label={`Lompat ke bagian ${index + 1}`}
+            className={`w-11 h-11 p-3 rounded-full transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 ${
               currentSection === index
-                ? "bg-blue-600 scale-125"
+                ? "bg-blue-600"
                 : "bg-gray-300 hover:bg-gray-400"
             }`}
-          />
+          >
+            <span
+              aria-hidden="true"
+              className={`w-2.5 h-2.5 rounded-full ${
+                currentSection === index ? "bg-white" : "bg-gray-600"
+              }`}
+            />
+          </button>
         ))}
       </div>
 
@@ -659,9 +667,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <MapPin className="w-4 h-4 text-white" />
                 </div>
-                <h4 className="text-white font-semibold mb-1 text-sm">
+                <h3 className="text-white font-semibold mb-1 text-sm">
                   Alamat Kantor
-                </h4>
+                </h3>
                 <p className="text-gray-300 text-xs">
                   Jl. Melati No. 11.Songgokerto
                 </p>
@@ -678,9 +686,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Mail className="w-4 h-4 text-white" />
                 </div>
-                <h4 className="text-white font-semibold mb-1 text-sm">
+                <h3 className="text-white font-semibold mb-1 text-sm">
                   Kontak
-                </h4>
+                </h3>
                 <p className="text-gray-300 text-xs">(0341) 512575</p>
                 <p className="text-gray-300 text-xs">bps3579@bps.go.id</p>
               </motion.div>
@@ -694,9 +702,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Clock className="w-4 h-4 text-white" />
                 </div>
-                <h4 className="text-white font-semibold mb-1 text-sm">
+                <h3 className="text-white font-semibold mb-1 text-sm">
                   Jam Operasional
-                </h4>
+                </h3>
                 <p className="text-gray-300 text-xs">Senin - Jumat</p>
                 <p className="text-gray-300 text-xs">08:00 - 16:00 WIB</p>
               </motion.div>
@@ -743,11 +751,22 @@ export default function HomePage() {
                     href={social.href}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={`Kunjungi ${
+                      social.href.includes('instagram')
+                        ? 'Instagram'
+                        : social.href.includes('facebook')
+                        ? 'Facebook'
+                        : social.href.includes('youtube')
+                        ? 'YouTube'
+                        : social.href.includes('x.com') || social.href.includes('twitter')
+                        ? 'X (Twitter)'
+                        : 'Situs Resmi BPS Kota Batu'
+                    }`}
                     whileHover={{ scale: 1.1, y: -2 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`w-8 h-8 ${social.color} rounded-lg flex items-center justify-center hover:shadow-lg transition-all duration-300`}
+                    className={`w-11 h-11 ${social.color} rounded-lg flex items-center justify-center hover:shadow-lg transition-all duration-300`}
                   >
-                    <social.icon className="w-4 h-4 text-white" />
+                    <social.icon className="w-5 h-5 text-white" aria-hidden="true" />
                   </motion.a>
                 ))}
               </div>
@@ -825,6 +844,7 @@ export default function HomePage() {
                     <button
                       onClick={() => setIsAuthModalOpen(false)}
                       className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+                      aria-label="Tutup modal autentikasi"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -877,6 +897,7 @@ export default function HomePage() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
                           >
                             {showPassword ? (
                               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -1031,6 +1052,7 @@ export default function HomePage() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                            aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
                           >
                             {showPassword ? (
                               <EyeOff className="h-5 w-5 text-gray-400" />
