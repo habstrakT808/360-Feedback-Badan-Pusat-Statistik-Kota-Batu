@@ -36,11 +36,16 @@ function RegularUserAssessment() {
         AssessmentService.getCurrentPeriod(),
       ]);
 
-      setAssignments(assignmentsData);
+      setAssignments(assignmentsData || []);
       setCurrentPeriod(periodData);
     } catch (error: any) {
       console.error("Error loading assignments:", error);
-      toast.error("Gagal memuat data penilaian: " + error.message);
+      // Don't show error toast if it's just no active period
+      if (!error.message?.includes('No active period')) {
+        toast.error("Gagal memuat data penilaian: " + error.message);
+      }
+      setAssignments([]);
+      setCurrentPeriod(null);
     } finally {
       setIsLoading(false);
     }

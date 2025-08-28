@@ -70,7 +70,7 @@ export default function SupervisorAssessmentPage() {
       // Get current period
       const periodData = await AssessmentService.getCurrentPeriod();
       if (!periodData) {
-        toast.error("Tidak ada periode penilaian yang aktif");
+        // Don't show error toast, just redirect gracefully
         router.push("/assessment");
         return;
       }

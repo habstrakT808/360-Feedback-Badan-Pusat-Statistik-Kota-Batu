@@ -39,6 +39,8 @@ export default function PinsPage() {
   const [selectedUser, setSelectedUser] = useState<PinRanking | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activePinPeriod, setActivePinPeriod] = useState<any | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
@@ -50,7 +52,7 @@ export default function PinsPage() {
     if (user?.id) {
       loadData();
     }
-  }, [user?.id]);
+  }, [user?.id, selectedMonth, selectedYear]);
 
   const loadData = async () => {
     try {
@@ -60,7 +62,10 @@ export default function PinsPage() {
       // await PinService.createTestPins(user!.id);
 
       const [monthly, allowance, members, pinPeriod] = await Promise.all([
-        PinService.getMonthlyRanking(),
+        PinService.getMonthlyRanking(
+          selectedMonth || undefined,
+          selectedYear || undefined
+        ),
         PinService.getMonthlyPinAllowance(user!.id),
         PinService.getAvailableTeamMembers(user!.id),
         PinPeriodService.getActive(),
@@ -358,17 +363,68 @@ export default function PinsPage() {
           {/* Monthly Ranking */}
           {activeTab === "monthly" && (
             <div>
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl">
-                  <Award className="w-6 h-6 text-white" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl">
+                    <Award className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Employee of the Month
+                    </h2>
+                    <p className="text-gray-600">
+                      Nominasi {getMonthName(selectedMonth || currentMonth)}{" "}
+                      {selectedYear || currentYear}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Employee of the Month
-                  </h2>
-                  <p className="text-gray-600">
-                    Nominasi {getMonthName(currentMonth)} {currentYear}
-                  </p>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedMonth || ""}
+                    onChange={(e) =>
+                      setSelectedMonth(
+                        e.target.value ? Number(e.target.value) : null
+                      )
+                    }
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Semua Bulan</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={m}>
+                        {getMonthName(m)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedYear || ""}
+                    onChange={(e) =>
+                      setSelectedYear(
+                        e.target.value ? Number(e.target.value) : null
+                      )
+                    }
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Semua Tahun</option>
+                    {Array.from(
+                      { length: 6 },
+                      (_, i) => currentYear - 4 + i
+                    ).map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                  {(selectedMonth || selectedYear) && (
+                    <button
+                      onClick={() => {
+                        setSelectedMonth(null);
+                        setSelectedYear(null);
+                      }}
+                      className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
+                    >
+                      Reset
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -376,10 +432,11 @@ export default function PinsPage() {
                 <div className="text-center py-16 bg-white rounded-2xl shadow-lg border border-gray-100">
                   <Award className="w-20 h-20 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-gray-500 mb-2">
-                    Belum ada pin yang diberikan bulan ini
+                    Tidak ada riwayat pada bulan ini
                   </h3>
                   <p className="text-gray-400">
-                    Perangkingan bulanan akan diperbarui setiap tanggal 1
+                    {getMonthName(selectedMonth || currentMonth)}{" "}
+                    {selectedYear || currentYear}
                   </p>
                 </div>
               ) : (
@@ -539,7 +596,10 @@ export default function PinsPage() {
           onClose={closeModal}
           user={selectedUser}
           periodType="monthly"
-          periodInfo={{ month: currentMonth, year: currentYear }}
+          periodInfo={{
+            month: selectedMonth || currentMonth,
+            year: selectedYear || currentYear,
+          }}
         />
       )}
     </DashboardLayout>

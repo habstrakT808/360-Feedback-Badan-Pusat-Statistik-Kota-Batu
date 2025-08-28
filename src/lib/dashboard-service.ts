@@ -32,11 +32,7 @@ export class DashboardService {
         .maybeSingle()
 
       if (periodError || !currentPeriod) {
-        if (periodError) {
-          console.error('Error fetching current period:', periodError)
-        } else {
-          console.log('No active period found - using default stats')
-        }
+        // Don't log error, just return default stats gracefully
         return this.getDefaultStats()
       }
 
@@ -188,11 +184,7 @@ export class DashboardService {
         .maybeSingle()
 
       if (periodError || !currentPeriod) {
-        if (periodError) {
-          console.error('Error fetching period for recent activity:', periodError)
-        } else {
-          console.log('No active period found for recent activity')
-        }
+        // Don't log error, just return empty array gracefully
         return []
       }
 

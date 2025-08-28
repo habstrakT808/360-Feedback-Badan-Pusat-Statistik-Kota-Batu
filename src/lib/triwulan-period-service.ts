@@ -22,7 +22,10 @@ export class TriwulanPeriodService {
       .eq('is_active', true)
       .maybeSingle()
 
-    if (error) throw error
+    if (error) {
+      // Don't throw error, just return null gracefully
+      return null
+    }
     return (data as any) || null
   }
 

@@ -260,14 +260,20 @@ export class AdminService {
 
       const totalEligibleUsers = eligibleUserIds.length
 
-      // Fetch assignments for the active period only
-      const { data: periodAssignments, error: paError } = await supabase
-        .from('assessment_assignments')
-        .select('assessor_id, assessee_id, is_completed, period_id')
-        .eq('period_id', activePeriod?.id || '')
+      // Fetch assignments for the active period only (guard when no active period)
+      let periodAssignments: Array<{ assessor_id: string; assessee_id: string; is_completed: boolean; period_id: string }>|null = null
+      if (activePeriod?.id) {
+        const { data, error: paError } = await supabase
+          .from('assessment_assignments')
+          .select('assessor_id, assessee_id, is_completed, period_id')
+          .eq('period_id', activePeriod.id)
 
-      if (paError) {
-        console.error('Error fetching period assignments:', paError)
+        if (paError) {
+          console.error('Error fetching period assignments:', paError)
+        }
+        periodAssignments = data
+      } else {
+        periodAssignments = []
       }
 
       // Keep only peer assignments: assessor is eligible (non-admin, non-supervisor) and assessee not admin

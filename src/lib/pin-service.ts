@@ -327,10 +327,12 @@ export class PinService {
     return rankings
   }
 
-  // Mendapatkan peringkat bulanan
-  static async getMonthlyRanking(): Promise<PinRanking[]> {
-    // SELALU gunakan helper function untuk konsistensi
-    const { month, year } = this.getConsistentWeekNumber()
+  // Mendapatkan peringkat bulanan (dengan filter bulan/tahun opsional)
+  static async getMonthlyRanking(monthOverride?: number, yearOverride?: number): Promise<PinRanking[]> {
+    // Gunakan override jika diberikan; jika tidak, gunakan helper konsisten
+    const { month: nowMonth, year: nowYear } = this.getConsistentWeekNumber()
+    const month = typeof monthOverride === 'number' ? monthOverride : nowMonth
+    const year = typeof yearOverride === 'number' ? yearOverride : nowYear
 
     console.log('🔍 Fetching Monthly Ranking for month:', month, 'year:', year)
 
@@ -390,6 +392,12 @@ export class PinService {
       return []
     }
 
+    // Jika tidak ada pin sama sekali pada bulan/tahun ini, kembalikan kosong
+    if (!pins || pins.length === 0) {
+      console.log('🔍 No monthly pins for month', month, 'year', year)
+      return []
+    }
+
     // Debug: log semua pin yang ditemukan
     if (pins && pins.length > 0) {
       console.log('🔍 All pins found for month', month, 'year', year, ':', pins.map(p => ({
@@ -400,8 +408,6 @@ export class PinService {
         month: p.month,
         created_at: p.created_at
       })))
-    } else {
-      console.log('🔍 No pins found for month', month, 'year', year)
     }
 
     // 3. Hitung jumlah pin per user
@@ -421,14 +427,21 @@ export class PinService {
       user: filteredUsers.find(u => u.id === userId)?.full_name
     })))
 
-    // 4. Buat ranking dengan semua user (termasuk yang 0 pin, exclude admin)
-    const rankings: PinRanking[] = filteredUsers.map((user, index) => ({
-      user_id: user.id,
-      full_name: user.full_name,
-      avatar_url: user.avatar_url || undefined,
-      pin_count: pinCounts.get(user.id) || 0,
-      rank: 0
-    }))
+    // 4. Buat ranking hanya untuk user yang menerima pin (>0)
+    const rankings: PinRanking[] = filteredUsers
+      .filter(user => (pinCounts.get(user.id) || 0) > 0)
+      .map(user => ({
+        user_id: user.id,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url || undefined,
+        pin_count: pinCounts.get(user.id) || 0,
+        rank: 0
+      }))
+
+    // Jika tak ada user dengan pin > 0, kembalikan kosong agar UI menampilkan pesan
+    if (rankings.length === 0) {
+      return []
+    }
 
     // 5. Sort berdasarkan jumlah pin (descending), kemudian nama (ascending) untuk yang sama
     rankings.sort((a, b) => {
@@ -547,8 +560,8 @@ export class PinService {
     return filteredData
   }
 
-  // Mendapatkan history pin yang diberikan oleh user
-  static async getPinHistory(userId: string, weekNumber?: number, year?: number) {
+  // Mendapatkan history pin yang diberikan oleh user (filter by month/year)
+  static async getPinHistory(userId: string, month?: number, year?: number) {
     let query = supabase
       .from('employee_pins')
       .select(`
@@ -562,8 +575,13 @@ export class PinService {
       .eq('giver_id', userId)
       .order('created_at', { ascending: false })
 
-    if (weekNumber && year) {
-      query = query.eq('week_number', weekNumber).eq('year', year)
+    // Terapkan filter tahun jika dipilih
+    if (typeof year === 'number') {
+      query = query.eq('year', year)
+    }
+    // Terapkan filter bulan jika dipilih
+    if (typeof month === 'number') {
+      query = query.eq('month', month)
     }
 
     const { data, error } = await query

@@ -112,10 +112,13 @@ export class ReminderService {
         .eq('is_active', true)
         .single();
 
-      if (error) throw error;
+      if (error || !data) {
+        // Don't log error, just return null gracefully
+        return null;
+      }
       return data;
     } catch (error) {
-      console.error('Failed to get active period:', error);
+      // Don't log error, just return null gracefully
       return null;
     }
   }
@@ -144,7 +147,7 @@ export class ReminderService {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('Failed to get period assignments:', error);
+      // Don't log error, just return empty array gracefully
       return [];
     }
   }

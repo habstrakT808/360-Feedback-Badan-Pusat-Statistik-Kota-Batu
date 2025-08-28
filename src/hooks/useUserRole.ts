@@ -1,4 +1,4 @@
-// src/hooks/useUserRole.ts (REPLACE COMPLETE FILE)
+// src/hooks/useUserRole.ts
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/store/useStore'
@@ -19,21 +19,43 @@ export function useUserRole() {
       try {
         console.log('🔍 Checking role for user:', user.id)
         
+        // First try to get role from user_roles table
         const { data, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle() // Use maybeSingle instead of single to avoid error if no record
 
         console.log('🔍 Role check result:', { data, error })
 
         if (error) {
           console.error('Role check error:', error)
-          setIsAdmin(false)
-          setIsSupervisor(false)
+          // Fallback to database function
+          try {
+            const { data: functionData, error: functionError } = await supabase
+              .rpc('get_current_user_role')
+            
+            if (functionError) {
+              console.error('Function role check error:', functionError)
+              setIsAdmin(false)
+              setIsSupervisor(false)
+            } else {
+              const role = functionData || 'user'
+              console.log('🔍 Function role result:', role)
+              setIsAdmin(role === 'admin')
+              setIsSupervisor(role === 'supervisor')
+            }
+          } catch (functionException) {
+            console.error('Function role check exception:', functionException)
+            setIsAdmin(false)
+            setIsSupervisor(false)
+          }
         } else {
-          setIsAdmin(data?.role === 'admin')
-          setIsSupervisor(data?.role === 'supervisor')
+          // If we got data from user_roles table
+          const role = data?.role || 'user'
+          console.log('🔍 Table role result:', role)
+          setIsAdmin(role === 'admin')
+          setIsSupervisor(role === 'supervisor')
         }
       } catch (error) {
         console.error('Role check exception:', error)

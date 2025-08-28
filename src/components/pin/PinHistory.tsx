@@ -27,7 +27,7 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
   const [pinHistory, setPinHistory] = useState<PinHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const { user } = useStore();
 
@@ -35,14 +35,14 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
     if (user?.id) {
       loadPinHistory();
     }
-  }, [user?.id, selectedWeek, selectedYear]);
+  }, [user?.id, selectedMonth, selectedYear]);
 
   const loadPinHistory = async () => {
     try {
       setIsLoading(true);
       const history = await PinService.getPinHistory(
         user!.id,
-        selectedWeek || undefined,
+        selectedMonth || undefined,
         selectedYear || undefined
       );
       setPinHistory(history);
@@ -81,14 +81,28 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
     });
   };
 
-  const getWeekLabel = (weekNumber: number, year: number) => {
-    return `Minggu ${weekNumber}, ${year}`;
+  const getMonthLabel = (month: number, year: number) => {
+    const months = [
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
+    ];
+    return `${months[month - 1]}, ${year}`;
   };
 
-  const getCurrentWeek = () => PinService.getCurrentWeekNumber();
+  const getCurrentMonth = () => PinService.getCurrentMonth();
   const getCurrentYear = () => PinService.getCurrentYear();
 
-  const weekOptions = Array.from({ length: 52 }, (_, i) => i + 1);
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
   const yearOptions = Array.from(
     { length: 5 },
     (_, i) => getCurrentYear() - 2 + i
@@ -126,16 +140,16 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
         <div className="flex items-center space-x-2">
           <Calendar className="w-4 h-4 text-gray-500" />
           <select
-            value={selectedWeek || ""}
+            value={selectedMonth || ""}
             onChange={(e) =>
-              setSelectedWeek(e.target.value ? Number(e.target.value) : null)
+              setSelectedMonth(e.target.value ? Number(e.target.value) : null)
             }
             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="">Semua Minggu</option>
-            {weekOptions.map((week) => (
-              <option key={week} value={week}>
-                Minggu {week}
+            <option value="">Semua Bulan</option>
+            {monthOptions.map((m) => (
+              <option key={m} value={m}>
+                {getMonthLabel(m, getCurrentYear()).split(",")[0]}
               </option>
             ))}
           </select>
@@ -161,7 +175,7 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
 
         <button
           onClick={() => {
-            setSelectedWeek(null);
+            setSelectedMonth(null);
             setSelectedYear(null);
           }}
           className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
@@ -178,11 +192,11 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
             <p className="text-sm text-blue-800">
               Periode saat ini:{" "}
               <span className="font-semibold">
-                Minggu {getCurrentWeek()}, {getCurrentYear()}
+                {getMonthLabel(getCurrentMonth(), getCurrentYear())}
               </span>
             </p>
             <p className="text-xs text-blue-600">
-              Pin hanya dapat diberikan pada hari Jumat
+              Pilih bulan dan tahun untuk memfilter riwayat pin
             </p>
           </div>
         </div>
@@ -196,7 +210,7 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
             Belum ada pin yang diberikan
           </h4>
           <p className="text-gray-400">
-            {selectedWeek || selectedYear
+            {selectedMonth || selectedYear
               ? "Tidak ada pin yang diberikan pada periode yang dipilih"
               : "Mulai berikan pin kepada rekan kerja Anda pada hari Jumat"}
           </p>
@@ -215,14 +229,14 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
               >
                 {/* Receiver Avatar */}
                 <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold">
-                  {pin.receiver.avatar_url ? (
+                  {pin.receiver?.avatar_url ? (
                     <img
                       src={pin.receiver.avatar_url}
-                      alt={pin.receiver.full_name}
+                      alt={pin.receiver?.full_name || "Pengguna"}
                       className="w-full h-full rounded-xl object-cover"
                     />
                   ) : (
-                    getInitials(pin.receiver.full_name)
+                    getInitials(pin.receiver?.full_name || "Tidak diketahui")
                   )}
                 </div>
 
@@ -235,10 +249,16 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
                     </span>
                   </div>
                   <h4 className="font-semibold text-gray-900">
-                    {pin.receiver.full_name}
+                    {pin.receiver?.full_name || "Pengguna tidak ditemukan"}
                   </h4>
                   <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <span>{getWeekLabel(pin.week_number, pin.year)}</span>
+                    <span>
+                      {getMonthLabel(
+                        (pin as any).month ||
+                          new Date(pin.created_at).getMonth() + 1,
+                        pin.year
+                      )}
+                    </span>
                     <span>•</span>
                     <span>{formatDate(pin.created_at)}</span>
                   </div>

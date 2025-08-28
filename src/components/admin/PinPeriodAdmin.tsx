@@ -103,6 +103,8 @@ export function PinPeriodAdmin() {
     }
   };
 
+  // Removed seeding helpers per request
+
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
       <div className="p-6 border-b border-gray-200 flex items-center justify-between">
@@ -110,13 +112,15 @@ export function PinPeriodAdmin() {
           <h2 className="text-xl font-bold text-gray-900">Pin Periods</h2>
           <p className="text-gray-600">Atur tanggal mulai dan selesai pin</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Pin Period</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={openCreate}
+            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Pin Period</span>
+          </button>
+        </div>
       </div>
 
       <div className="p-6">

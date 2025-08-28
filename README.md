@@ -189,6 +189,7 @@ System Events → Check User Preferences → Send In-App + Email → User Receiv
 ### Priority 1 (High Priority) - Estimated: 2-3 weeks
 
 1. **Settings & Preferences Page** (`/settings`)
+
    - User profile management
    - Password change functionality
    - Email preferences
@@ -197,6 +198,7 @@ System Events → Check User Preferences → Send In-App + Email → User Receiv
    - Notification preferences
 
 2. **Enhanced User Profiles** (`/profile/[id]`)
+
    - Detailed user profile pages
    - Performance history timeline
    - Skills tracking
@@ -214,6 +216,7 @@ System Events → Check User Preferences → Send In-App + Email → User Receiv
 ### Priority 2 (Medium Priority) - Estimated: 3-4 weeks
 
 4. **Advanced Analytics & Reporting** (`/reports`)
+
    - Comprehensive analytics dashboard
    - Trend analysis (performance over time)
    - Comparative analysis (department vs department)
@@ -222,6 +225,7 @@ System Events → Check User Preferences → Send In-App + Email → User Receiv
    - Executive dashboard
 
 5. **Mobile Optimization & PWA**
+
    - Progressive Web App (PWA)
    - Offline functionality
    - Mobile-first responsive design
@@ -237,6 +241,7 @@ System Events → Check User Preferences → Send In-App + Email → User Receiv
 ### Priority 3 (Future Enhancements) - Estimated: 4-5 weeks
 
 7. **AI-Powered Features** (`/insights`)
+
    - Automated performance insights
    - Sentiment analysis on comments
    - Pattern recognition in feedback
@@ -244,6 +249,7 @@ System Events → Check User Preferences → Send In-App + Email → User Receiv
    - Predictive analytics
 
 8. **Workflow & Automation** (`/admin/workflows`)
+
    - Custom assessment workflows
    - Approval processes
    - Automated actions
@@ -466,7 +472,7 @@ export default function NewPage() {
 ```typescript
 export class NewService {
   static async getData() {
-    const { data, error } = await supabase.from('table_name').select('*');
+    const { data, error } = await supabase.from("table_name").select("*");
 
     if (error) throw error;
     return data;
@@ -474,7 +480,7 @@ export class NewService {
 
   static async createData(payload: any) {
     const { data, error } = await supabase
-      .from('table_name')
+      .from("table_name")
       .insert(payload)
       .select()
       .single();

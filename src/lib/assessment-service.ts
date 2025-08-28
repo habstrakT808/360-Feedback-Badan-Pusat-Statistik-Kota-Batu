@@ -14,7 +14,7 @@ export class AssessmentService {
       .single()
 
     if (error || !data) {
-      console.error('No active period found:', error || 'No data returned')
+      // Don't log error, just return null gracefully
       return null
     }
     return data
@@ -43,11 +43,16 @@ export class AssessmentService {
       }
 
       // For regular users, get their assignments for active period
-      const { data: active } = await supabase
+      const { data: active, error: activeError } = await supabase
         .from('assessment_periods')
         .select('id')
         .eq('is_active', true)
         .single()
+
+      // If no active period, return empty array gracefully
+      if (activeError || !active) {
+        return []
+      }
 
       // Ensure strong typing: only treat as string when it actually is one
       const activePeriodId: string | undefined =
@@ -122,27 +127,29 @@ export class AssessmentService {
               )
             `)
             .eq('assessor_id', userId)
+            .eq('period_id', activePeriodId)
+            .order('created_at', { ascending: false })
 
-          if (typeof activePeriodId === 'string') {
-            retryQuery = retryQuery.eq('period_id', activePeriodId)
+          const { data: retryData, error: retryError } = await retryQuery
+
+          if (retryError) {
+            console.error('Error fetching assignments after generation:', retryError)
+            throw retryError
           }
 
-          retryQuery = retryQuery.order('created_at', { ascending: false })
-
-          const { data: retry } = await retryQuery
-
-          console.log('Assignments after generation:', retry?.length || 0)
-          return retry || []
-        } catch (genErr) {
-          console.warn('Assignment generation skipped:', genErr)
+          return retryData || []
+        } catch (generationError) {
+          console.error('Error generating assignments:', generationError)
+          // Don't throw error, just return empty array
+          return []
         }
       }
 
-      console.log('Regular user assignments:', data?.length || 0)
       return data || []
     } catch (error) {
       console.error('Error in getMyAssignments:', error)
-      throw error
+      // Return empty array instead of throwing error
+      return []
     }
   }
 

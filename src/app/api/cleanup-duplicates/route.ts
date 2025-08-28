@@ -75,10 +75,23 @@ export async function POST(request: NextRequest) {
       })
     })
 
+    // Also remove assignment notifications (we only want welcome + tips)
+    const assignmentNotifications = allNotifications.filter(n => {
+      const type = n.metadata?.notification_type || 
+                  (n.title?.includes('Penilaian Menunggu') ? 'assignment' : 'unknown')
+      return type === 'assignment'
+    })
+    
+    if (assignmentNotifications.length > 0) {
+      idsToDelete.push(...assignmentNotifications.map(n => n.id))
+      totalDuplicates += assignmentNotifications.length
+      console.log(`Removing ${assignmentNotifications.length} assignment notifications (not needed for initial setup)`)
+    }
+
     if (idsToDelete.length > 0) {
       console.log(`🗑️ Deleting ${idsToDelete.length} duplicate notifications...`)
       
-      // Delete in batches to avoid timeout
+      // Delete in batches to avoid overwhelming the database
       const batchSize = 50
       for (let i = 0; i < idsToDelete.length; i += batchSize) {
         const batch = idsToDelete.slice(i, i + batchSize)
@@ -88,35 +101,118 @@ export async function POST(request: NextRequest) {
           .in('id', batch)
         
         if (deleteError) {
-          console.error(`Error deleting batch ${Math.floor(i/batchSize) + 1}:`, deleteError)
-          return NextResponse.json({ success: false, error: deleteError.message }, { status: 500 })
+          console.error('Error deleting batch:', deleteError)
+          return NextResponse.json({ 
+            success: false, 
+            error: `Failed to delete duplicates: ${deleteError.message}` 
+          }, { status: 500 })
         }
-        
-        console.log(`Deleted batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(idsToDelete.length/batchSize)}`)
       }
-
-      console.log(`✅ Successfully removed ${idsToDelete.length} duplicate notifications`)
       
-      return NextResponse.json({ 
-        success: true, 
-        message: `Cleaned up ${idsToDelete.length} duplicate notifications`,
-        deletedCount: idsToDelete.length,
-        totalDuplicates
-      })
-    } else {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'No duplicate notifications found',
-        deletedCount: 0,
-        totalDuplicates: 0
-      })
+      console.log(`✅ Successfully deleted ${idsToDelete.length} duplicate notifications`)
     }
-    
+
+    // Get final count per user
+    const finalCounts = new Map<string, number>()
+    userNotificationGroups.forEach((userTypes, userId) => {
+      let count = 0
+      userTypes.forEach((notifications, type) => {
+        if (type !== 'assignment') { // Don't count assignment notifications
+          count += Math.min(notifications.length, 1) // Only count 1 per type
+        }
+      })
+      finalCounts.set(userId, count)
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: `Cleanup completed successfully`,
+      total_duplicates_removed: totalDuplicates,
+      users_processed: userNotificationGroups.size,
+      final_counts: Object.fromEntries(finalCounts),
+      timestamp: new Date().toISOString()
+    })
   } catch (error: any) {
-    console.error('Error in cleanup duplicates:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: error.message || 'Unknown error occurred' 
+    console.error('Cleanup failed:', error)
+    return NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 })
+  }
+}
+
+// GET method to check current notification status
+export async function GET() {
+  try {
+    console.log('🔍 Checking notification status...')
+    
+    // Get all system notifications
+    const { data: allNotifications, error: fetchError } = await supabaseAdmin
+      .from('notifications')
+      .select('id, user_id, title, message, created_at, metadata')
+      .eq('type', 'system')
+      .order('created_at', { ascending: false })
+
+    if (fetchError) {
+      return NextResponse.json({ success: false, error: fetchError.message }, { status: 500 })
+    }
+
+    // Group by user and count by type
+    const userStats = new Map<string, { welcome: number, tips: number, assignment: number, total: number }>()
+    
+    allNotifications?.forEach(notification => {
+      const userId = notification.user_id
+      let type = 'unknown'
+      
+      if (notification.metadata?.notification_type) {
+        type = notification.metadata.notification_type
+      } else if (notification.title?.includes('Selamat datang')) {
+        type = 'welcome'
+      } else if (notification.title?.includes('Tips')) {
+        type = 'tips'
+      } else if (notification.title?.includes('Penilaian Menunggu')) {
+        type = 'assignment'
+      }
+      
+      if (!userStats.has(userId)) {
+        userStats.set(userId, { welcome: 0, tips: 0, assignment: 0, total: 0 })
+      }
+      
+      const stats = userStats.get(userId)!
+      if (type === 'welcome') stats.welcome++
+      else if (type === 'tips') stats.tips++
+      else if (type === 'assignment') stats.assignment++
+      stats.total++
+    })
+
+    // Calculate summary
+    const summary = {
+      total_users: userStats.size,
+      users_with_duplicates: 0,
+      users_with_correct_count: 0,
+      total_notifications: allNotifications?.length || 0
+    }
+
+    userStats.forEach(stats => {
+      if (stats.total > 2) {
+        summary.users_with_duplicates++
+      } else if (stats.welcome === 1 && stats.tips === 1) {
+        summary.users_with_correct_count++
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Notification status check completed',
+      summary,
+      user_details: Object.fromEntries(userStats),
+      timestamp: new Date().toISOString()
+    })
+  } catch (error: any) {
+    console.error('Status check failed:', error)
+    return NextResponse.json({
+      success: false,
+      error: error.message
     }, { status: 500 })
   }
 }

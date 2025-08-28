@@ -496,44 +496,271 @@ export class SmartNotificationServiceImproved {
 
       // Send daily reminders
       for (const [userId, userData] of userCounts) {
-        const firstName = userData.name.split(' ')[0]
+        const title = `⏰ Pengingat: Penilaian 360° Menunggu`
+        const message = `${userData.name}, Anda memiliki ${userData.count} penilaian 360° yang belum diselesaikan. Deadline: ${daysLeft} hari lagi.`
         
-        let urgency: 'low' | 'medium' | 'high' | 'urgent' = 'medium'
-        let emoji = '📋'
-        let prefix = 'Pengingat'
+        await NotificationService.createNotification({
+          user_id: userId,
+          title,
+          message,
+          type: 'reminder',
+          priority: 'high',
+          action_url: '/assessment',
+          metadata: {
+            notification_type: 'daily_reminder_360',
+            period_id: period.id,
+            days_left: daysLeft,
+            pending_count: userData.count
+          }
+        })
+      }
 
-        if (daysLeft <= 1) {
-          urgency = 'urgent'
-          emoji = '🚨'
-          prefix = 'URGENT - Deadline Hari Ini'
-        } else if (daysLeft <= 3) {
-          urgency = 'urgent'
-          emoji = '⚠️'
-          prefix = `Deadline ${daysLeft} Hari Lagi`
-        } else if (daysLeft <= 7) {
-          urgency = 'high'
-          emoji = '⏰'
-          prefix = `Deadline ${daysLeft} Hari Lagi`
-        }
+      console.log(`✅ Sent ${userCounts.size} daily reminders`)
+    } catch (error) {
+      console.error('Failed to send daily reminders:', error)
+    }
+  }
 
+  // Comprehensive daily reminder system
+  static async sendComprehensiveDailyReminders(): Promise<void> {
+    try {
+      console.log('🔔 Sending comprehensive daily reminders...')
+      
+      // Get all users (excluding admins)
+      const { data: users, error: usersError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name')
+
+      if (usersError || !users) {
+        console.error('Failed to fetch users:', usersError)
+        return
+      }
+
+      // Get admin IDs to exclude
+      const { data: adminUsers } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+
+      const adminIds = adminUsers?.map(u => u.user_id) || []
+      const regularUsers = users.filter(user => !adminIds.includes(user.id))
+
+      console.log(`📧 Processing ${regularUsers.length} users for daily reminders...`)
+
+      for (const user of regularUsers) {
         try {
-          await NotificationService.sendSystemNotification(
-            [userId],
-            `${emoji} ${prefix}: ${userData.count} Penilaian`,
-            `${firstName}, pengingat: Anda masih memiliki ${userData.count} penilaian yang belum diselesaikan. Deadline dalam ${daysLeft} hari lagi. Jangan sampai terlewat!`,
-            '/assessment',
-            urgency
-          )
-
-          await new Promise(resolve => setTimeout(resolve, 200))
+          await this.sendUserDailyReminders(user)
+          await new Promise(resolve => setTimeout(resolve, 200)) // Delay between users
         } catch (error) {
-          console.error(`Failed to send reminder to ${firstName}:`, error)
+          console.error(`Failed to send reminders for ${user.full_name}:`, error)
         }
       }
 
-      console.log(`✅ Daily reminders sent to ${userCounts.size} users`)
+      console.log('✅ Comprehensive daily reminders completed!')
     } catch (error) {
-      console.error('❌ Failed to send daily reminders:', error)
+      console.error('❌ Failed to send comprehensive daily reminders:', error)
+    }
+  }
+
+  // Send daily reminders for a specific user
+  private static async sendUserDailyReminders(user: any): Promise<void> {
+    const firstName = user.full_name.split(' ')[0]
+    const reminders: any[] = []
+
+    // 1. Check 360° Assessment reminders
+    const assessmentReminder = await this.checkAssessmentReminders(user.id)
+    if (assessmentReminder) {
+      reminders.push(assessmentReminder)
+    }
+
+    // 2. Check Pin System reminders
+    const pinReminder = await this.checkPinSystemReminders(user.id)
+    if (pinReminder) {
+      reminders.push(pinReminder)
+    }
+
+    // 3. Check Triwulan reminders
+    const triwulanReminder = await this.checkTriwulanReminders(user.id)
+    if (triwulanReminder) {
+      reminders.push(triwulanReminder)
+    }
+
+    // Send reminders (limit to 1 per day per type to avoid spam)
+    for (const reminder of reminders) {
+      const wasSentToday = await this.wasReminderSentToday(user.id, reminder.metadata.notification_type)
+      if (!wasSentToday) {
+        await NotificationService.createNotification(reminder)
+        console.log(`📤 Sent ${reminder.metadata.notification_type} reminder to ${firstName}`)
+      }
+    }
+  }
+
+  // Check if reminder was already sent today
+  private static async wasReminderSentToday(userId: string, reminderType: string): Promise<boolean> {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const { data: existingReminders } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('type', 'reminder')
+      .gte('created_at', today.toISOString())
+      .eq('metadata->notification_type', reminderType)
+
+    return (existingReminders?.length || 0) > 0
+  }
+
+  // Check 360° Assessment reminders
+  private static async checkAssessmentReminders(userId: string): Promise<any | null> {
+    try {
+      // Get active period
+      const { data: period } = await supabase
+        .from('assessment_periods')
+        .select('*')
+        .eq('is_active', true)
+        .single()
+
+      if (!period) return null
+
+      // Get pending assignments for this user
+      const { data: pendingAssignments } = await supabase
+        .from('assessment_assignments')
+        .select(`
+          id,
+          assessee:profiles!assessment_assignments_assessee_id_fkey(full_name)
+        `)
+        .eq('assessor_id', userId)
+        .eq('period_id', period.id)
+        .eq('is_completed', false)
+
+      if (!pendingAssignments || pendingAssignments.length === 0) return null
+
+      // Calculate days left
+      const daysLeft = Math.ceil(
+        (new Date(period.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      // Only send reminder if deadline is approaching or there are many pending
+      if (daysLeft > 7 && pendingAssignments.length < 3) return null
+
+      const assesseeNames = pendingAssignments.map(a => a.assessee?.full_name || 'Unknown').join(', ')
+      
+      return {
+        user_id: userId,
+        title: `⏰ Pengingat: Penilaian 360° Menunggu`,
+        message: `Anda memiliki ${pendingAssignments.length} penilaian 360° yang belum diselesaikan untuk: ${assesseeNames}.${daysLeft <= 7 ? ` Deadline: ${daysLeft} hari lagi!` : ''}`,
+        type: 'reminder',
+        priority: daysLeft <= 3 ? 'high' : 'medium',
+        action_url: '/assessment',
+        metadata: {
+          notification_type: 'daily_reminder_360',
+          period_id: period.id,
+          days_left: daysLeft,
+          pending_count: pendingAssignments.length,
+          assessee_names: assesseeNames
+        }
+      }
+    } catch (error) {
+      console.error('Error checking assessment reminders:', error)
+      return null
+    }
+  }
+
+  // Check Pin System reminders
+  private static async checkPinSystemReminders(userId: string): Promise<any | null> {
+    try {
+      // Get active pin period
+      const { data: pinPeriod } = await supabase
+        .from('pin_periods')
+        .select('*')
+        .eq('is_active', true)
+        .single()
+
+      if (!pinPeriod) return null
+
+      // Check if user has already submitted pins this period
+      const { data: existingPins } = await supabase
+        .from('pins')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('period_id', pinPeriod.id)
+
+      if (existingPins && existingPins.length > 0) return null
+
+      // Calculate days left
+      const daysLeft = Math.ceil(
+        (new Date(pinPeriod.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      // Only send reminder if deadline is approaching
+      if (daysLeft > 7) return null
+
+      return {
+        user_id: userId,
+        title: `📌 Pengingat: Sistem Pin Menunggu`,
+        message: `Anda belum mengisi sistem pin untuk periode ini.${daysLeft <= 3 ? ` Deadline: ${daysLeft} hari lagi!` : ` Tersisa ${daysLeft} hari.`}`,
+        type: 'reminder',
+        priority: daysLeft <= 3 ? 'high' : 'medium',
+        action_url: '/pins',
+        metadata: {
+          notification_type: 'daily_reminder_pin',
+          period_id: pinPeriod.id,
+          days_left: daysLeft
+        }
+      }
+    } catch (error) {
+      console.error('Error checking pin system reminders:', error)
+      return null
+    }
+  }
+
+  // Check Triwulan reminders
+  private static async checkTriwulanReminders(userId: string): Promise<any | null> {
+    try {
+      // Get active triwulan period
+      const { data: triwulanPeriod } = await supabase
+        .from('triwulan_periods')
+        .select('*')
+        .eq('is_active', true)
+        .single()
+
+      if (!triwulanPeriod) return null
+
+      // Check if user has already submitted triwulan this period
+      const { data: existingTriwulan } = await supabase
+        .from('triwulan_assessments')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('period_id', triwulanPeriod.id)
+
+      if (existingTriwulan && existingTriwulan.length > 0) return null
+
+      // Calculate days left
+      const daysLeft = Math.ceil(
+        (new Date(triwulanPeriod.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+      )
+
+      // Only send reminder if deadline is approaching
+      if (daysLeft > 7) return null
+
+      return {
+        user_id: userId,
+        title: `📊 Pengingat: Penilaian Triwulan Menunggu`,
+        message: `Anda belum mengisi penilaian triwulan untuk periode ini.${daysLeft <= 3 ? ` Deadline: ${daysLeft} hari lagi!` : ` Tersisa ${daysLeft} hari.`}`,
+        type: 'reminder',
+        priority: daysLeft <= 3 ? 'high' : 'medium',
+        action_url: '/triwulan',
+        metadata: {
+          notification_type: 'daily_reminder_triwulan',
+          period_id: triwulanPeriod.id,
+          days_left: daysLeft
+        }
+      }
+    } catch (error) {
+      console.error('Error checking triwulan reminders:', error)
+      return null
     }
   }
 }

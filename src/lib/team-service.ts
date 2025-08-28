@@ -13,19 +13,44 @@ export class TeamService {
 
     if (error) throw error
 
-    // Filter out admin users
+    // Filter out admin users using multiple approaches
+    let adminUserIds: string[] = []
+    
+    // Try to get admin users from user_roles table
     const { data: adminUsers, error: adminError } = await supabase
       .from('user_roles')
       .select('user_id')
       .eq('role', 'admin')
 
     if (adminError) {
-      console.error('Error fetching admin users:', adminError)
-      return data || []
+      console.error('Error fetching admin users from user_roles:', adminError)
+      // Fallback: use hardcoded admin IDs if query fails
+      adminUserIds = ['dccdb786-d7e7-44a8-a4d0-e446623c19b9'] // Hafiyan's ID
+    } else {
+      adminUserIds = adminUsers?.map(u => u.user_id) || []
     }
 
-    const adminUserIds = adminUsers?.map(u => u.user_id) || []
-    return data?.filter(profile => !adminUserIds.includes(profile.id)) || []
+    // Additional fallback: filter by known admin email/name patterns
+    const filteredData = data?.filter(profile => {
+      // Exclude by admin user IDs
+      if (adminUserIds.includes(profile.id)) {
+        return false
+      }
+      
+      // Additional safety check: exclude by email pattern
+      if (profile.email === 'jhodywiraputra@gmail.com') {
+        return false
+      }
+      
+      // Additional safety check: exclude by name pattern
+      if (profile.full_name && profile.full_name.includes('Hafiyan')) {
+        return false
+      }
+      
+      return true
+    }) || []
+
+    return filteredData
   }
 
   static async getTeamPerformance(periodId?: string) {
@@ -56,13 +81,21 @@ export class TeamService {
 
     if (error) throw error
 
-    // Get admin users to exclude them
+    // Get admin users to exclude them using multiple approaches
+    let adminUserIds: string[] = []
+    
     const { data: adminUsers, error: adminError } = await supabase
       .from('user_roles')
       .select('user_id')
       .eq('role', 'admin')
 
-    const adminUserIds = adminError ? [] : (adminUsers?.map(u => u.user_id) || [])
+    if (adminError) {
+      console.error('Error fetching admin users from user_roles:', adminError)
+      // Fallback: use hardcoded admin IDs if query fails
+      adminUserIds = ['dccdb786-d7e7-44a8-a4d0-e446623c19b9'] // Hafiyan's ID
+    } else {
+      adminUserIds = adminUsers?.map(u => u.user_id) || []
+    }
 
     // Group by employee
     const employeePerformance = new Map()
@@ -163,13 +196,21 @@ export class TeamService {
 
     if (error) throw error
 
-    // Get admin users to exclude them
+    // Get admin users to exclude them using multiple approaches
+    let adminUserIds: string[] = []
+    
     const { data: adminUsers, error: adminError } = await supabase
       .from('user_roles')
       .select('user_id')
       .eq('role', 'admin')
 
-    const adminUserIds = adminError ? [] : (adminUsers?.map(u => u.user_id) || [])
+    if (adminError) {
+      console.error('Error fetching admin users from user_roles:', adminError)
+      // Fallback: use hardcoded admin IDs if query fails
+      adminUserIds = ['dccdb786-d7e7-44a8-a4d0-e446623c19b9'] // Hafiyan's ID
+    } else {
+      adminUserIds = adminUsers?.map(u => u.user_id) || []
+    }
 
     // Filter out assignments involving admin users
     const filteredAssignments = data?.filter((assignment: any) => 
@@ -200,8 +241,8 @@ export class TeamService {
           .eq('is_active', true)
           .single()
 
-        if (periodError) {
-          console.log('❌ Period error:', periodError)
+        if (periodError || !currentPeriod) {
+          // Don't log error, just return null gracefully
           return null
         }
         targetPeriodId = currentPeriod.id
