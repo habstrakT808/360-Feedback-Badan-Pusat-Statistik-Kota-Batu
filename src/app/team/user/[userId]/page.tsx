@@ -61,12 +61,30 @@ export default function PublicProfilePage() {
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+
+  // This state helps prevent race conditions when role loading completes
+  // and isSupervisor changes from false to true
 
   useEffect(() => {
-    if (userId) {
+    if (userId && !roleLoading) {
+      // Always retry if role loading is complete and we haven't loaded yet
+      // or if we're a supervisor and previously got a private profile error
+      if (!hasAttemptedLoad || (isSupervisor && error === "Profil ini bersifat privat")) {
+        setHasAttemptedLoad(true);
+        loadUserProfile();
+      }
+    }
+  }, [userId, roleLoading, isSupervisor, hasAttemptedLoad, error]);
+
+  // Additional effect to handle supervisor role changes
+  useEffect(() => {
+    if (userId && !roleLoading && isSupervisor && error === "Profil ini bersifat privat") {
+      // Clear error and retry when supervisor role is confirmed
+      setError(null);
       loadUserProfile();
     }
-  }, [userId]);
+  }, [userId, roleLoading, isSupervisor, error]);
 
   const loadUserProfile = async () => {
     try {
@@ -79,15 +97,22 @@ export default function PublicProfilePage() {
         .eq("id", userId)
         .single();
 
-      if (profileError) throw profileError;
-
-      // Check if user allows public view OR if current user is supervisor
-      if (!profileData.allow_public_view && !isSupervisor) {
-        setError("Profil ini bersifat privat");
-        setIsLoading(false);
-        return;
+      if (profileError) {
+        throw profileError;
       }
 
+             // Check if user allows public view OR if current user is supervisor
+       // Only deny access if profile is private AND user is not a supervisor
+       if (!profileData.allow_public_view && !isSupervisor) {
+         setError("Profil ini bersifat privat");
+         setIsLoading(false);
+         return;
+       }
+       
+       // Clear any previous error if we're a supervisor accessing a private profile
+       if (isSupervisor && !profileData.allow_public_view) {
+         setError(null);
+       }
       setProfile({
         ...profileData,
         allow_public_view: profileData.allow_public_view || false,
@@ -95,27 +120,23 @@ export default function PublicProfilePage() {
 
       // Get performance data
       await loadPerformanceData(userId);
-    } catch (error: any) {
-      console.error("Error loading profile:", error);
-      setError(error.message || "Gagal memuat profil");
-    } finally {
+         } catch (error: any) {
+       setError(error.message || "Gagal memuat profil");
+     } finally {
       setIsLoading(false);
     }
   };
 
   const loadPerformanceData = async (userId: string) => {
     try {
-      console.log("🔄 Loading performance data for user:", userId);
       setIsLoadingPerformance(true);
 
       // Use the new TeamService method to get real performance data
       const performanceData = await TeamService.getUserPerformance(userId);
 
       if (performanceData) {
-        console.log("📊 Retrieved performance data:", performanceData);
         setPerformance(performanceData);
       } else {
-        console.log("⚠️ No performance data found, using default");
         // Set default performance data if no data found
         const defaultPerformance = {
           averageRating: 0,
@@ -141,11 +162,9 @@ export default function PublicProfilePage() {
             "Analisis data",
           ],
         };
-        console.log("📊 Setting default performance:", defaultPerformance);
         setPerformance(defaultPerformance);
       }
     } catch (error: any) {
-      console.error("💥 Error loading performance data:", error);
       toast.error(`Gagal memuat data performa: ${error.message}`);
 
       // Set default performance data on error
@@ -173,10 +192,6 @@ export default function PublicProfilePage() {
           "Analisis data",
         ],
       };
-      console.log(
-        "📊 Setting default performance on error:",
-        defaultPerformance
-      );
       setPerformance(defaultPerformance);
     } finally {
       setIsLoadingPerformance(false);
@@ -203,10 +218,9 @@ export default function PublicProfilePage() {
               Profil Tidak Tersedia
             </h2>
             <p className="text-gray-600 mb-4">
-              {isSupervisor 
-                ? (error || "Profil ini tidak ditemukan atau telah dihapus")
-                : "Profil ini bersifat privat dan hanya dapat diakses oleh supervisor"
-              }
+              {isSupervisor
+                ? error || "Profil ini tidak ditemukan atau telah dihapus"
+                : "Profil ini bersifat privat dan hanya dapat diakses oleh supervisor"}
             </p>
             <button
               onClick={() => router.back()}
@@ -277,23 +291,24 @@ export default function PublicProfilePage() {
               </div>
 
               <div className="text-right">
-                <div className={`flex items-center space-x-2 mb-2 ${
-                  profile.allow_public_view 
-                    ? "text-green-300" 
-                    : "text-yellow-300"
-                }`}>
+                <div
+                  className={`flex items-center space-x-2 mb-2 ${
+                    profile.allow_public_view
+                      ? "text-green-300"
+                      : "text-yellow-300"
+                  }`}
+                >
                   {profile.allow_public_view ? (
                     <Globe className="w-4 h-4" />
                   ) : (
                     <Lock className="w-4 h-4" />
                   )}
                   <span className="text-sm">
-                    {profile.allow_public_view 
-                      ? "Profil Publik" 
-                      : isSupervisor 
-                        ? "Profil Privat (Supervisor Access)" 
-                        : "Profil Privat"
-                    }
+                    {profile.allow_public_view
+                      ? "Profil Publik"
+                      : isSupervisor
+                      ? "Profil Privat (Supervisor Access)"
+                      : "Profil Privat"}
                   </span>
                 </div>
                 <div className="text-3xl font-bold">
