@@ -1,8 +1,0 @@
-User-agent: *
-Allow: /
-
-# Sitemap
-Sitemap: https://bps-feedback.vercel.app/sitemap.xml
-
-# Crawl-delay
-Crawl-delay: 1

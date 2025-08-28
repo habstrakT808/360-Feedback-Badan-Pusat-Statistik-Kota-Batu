@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import {
   BarChart3,
   Users,
@@ -103,10 +102,10 @@ export default function HomePage() {
 
       // Allow scrolling to footer section
       if (e.deltaY > 0 && currentSection < sectionsRef.current.length - 1) {
-        console.log('Scrolling down to section:', currentSection + 1);
+        console.log("Scrolling down to section:", currentSection + 1);
         setCurrentSection((prev) => prev + 1);
       } else if (e.deltaY < 0 && currentSection > 0) {
-        console.log('Scrolling up to section:', currentSection - 1);
+        console.log("Scrolling up to section:", currentSection - 1);
         setCurrentSection((prev) => prev - 1);
       }
     };
@@ -129,26 +128,31 @@ export default function HomePage() {
 
       if (isFooterSection && !isMobile) {
         // Center the footer section properly with precise positioning
-        console.log('Scrolling to footer section with precise positioning');
+        console.log("Scrolling to footer section with precise positioning");
         setTimeout(() => {
           const footerElement = targetSection;
           const viewportHeight = window.innerHeight;
           const footerHeight = footerElement.offsetHeight;
-          const scrollTop = footerElement.offsetTop - (viewportHeight - footerHeight) / 2;
-          
-          console.log('Footer scroll calculation:', { viewportHeight, footerHeight, scrollTop });
-          
+          const scrollTop =
+            footerElement.offsetTop - (viewportHeight - footerHeight) / 2;
+
+          console.log("Footer scroll calculation:", {
+            viewportHeight,
+            footerHeight,
+            scrollTop,
+          });
+
           // Try both methods to ensure footer is visible
           try {
             footerElement.scrollIntoView({
               behavior: "smooth",
-              block: "center"
+              block: "center",
             });
           } catch (error) {
-            console.log('Fallback to window.scrollTo');
+            console.log("Fallback to window.scrollTo");
             window.scrollTo({
               top: scrollTop,
-              behavior: "smooth"
+              behavior: "smooth",
             });
           }
         }, 100);
@@ -298,7 +302,10 @@ export default function HomePage() {
   );
 
   return (
-    <div ref={containerRef} className="relative overflow-x-hidden main-container">
+    <div
+      ref={containerRef}
+      className="relative overflow-x-hidden main-container"
+    >
       {/* Navigation Dots - Hidden on mobile */}
       <div className="fixed right-8 top-1/2 transform -translate-y-1/2 z-40 space-y-3 hidden lg:block">
         {[0, 1, 2, 3].map((index) => (
@@ -331,13 +338,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <Image
-                src="/logo-bps-optimized.svg"
+              <img
+                src="/logo-bps.png"
                 alt="BPS Logo"
-                width={32}
-                height={32}
                 className="w-6 h-6 sm:w-8 sm:h-8 object-contain"
-                priority
               />
             </div>
             <div>
@@ -637,11 +641,9 @@ export default function HomePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-center space-x-3">
                 <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                  <Image
-                    src="/logo-bps-optimized.svg"
+                  <img
+                    src="/logo-bps.png"
                     alt="BPS Logo"
-                    width={40}
-                    height={40}
                     className="w-10 h-10 object-contain"
                   />
                 </div>
@@ -673,9 +675,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <MapPin className="w-4 h-4 text-white" />
                 </div>
-                <h4 className="text-white font-semibold mb-1 text-sm">
+                <h3 className="text-white font-semibold mb-1 text-sm">
                   Alamat Kantor
-                </h4>
+                </h3>
                 <p className="text-gray-300 text-xs">
                   Jl. Melati No. 11.Songgokerto
                 </p>
@@ -692,9 +694,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Mail className="w-4 h-4 text-white" />
                 </div>
-                <h4 className="text-white font-semibold mb-1 text-sm">
+                <h3 className="text-white font-semibold mb-1 text-sm">
                   Kontak
-                </h4>
+                </h3>
                 <p className="text-gray-300 text-xs">(0341) 512575</p>
                 <p className="text-gray-300 text-xs">bps3579@bps.go.id</p>
               </motion.div>
@@ -708,9 +710,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Clock className="w-4 h-4 text-white" />
                 </div>
-                <h4 className="text-white font-semibold mb-1 text-sm">
+                <h3 className="text-white font-semibold mb-1 text-sm">
                   Jam Operasional
-                </h4>
+                </h3>
                 <p className="text-gray-300 text-xs">Senin - Jumat</p>
                 <p className="text-gray-300 text-xs">08:00 - 16:00 WIB</p>
               </motion.div>
@@ -758,21 +760,25 @@ export default function HomePage() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={`Kunjungi ${
-                      social.href.includes('instagram')
-                        ? 'Instagram'
-                        : social.href.includes('facebook')
-                        ? 'Facebook'
-                        : social.href.includes('youtube')
-                        ? 'YouTube'
-                        : social.href.includes('x.com') || social.href.includes('twitter')
-                        ? 'X (Twitter)'
-                        : 'Situs Resmi BPS Kota Batu'
+                      social.href.includes("instagram")
+                        ? "Instagram"
+                        : social.href.includes("facebook")
+                        ? "Facebook"
+                        : social.href.includes("youtube")
+                        ? "YouTube"
+                        : social.href.includes("x.com") ||
+                          social.href.includes("twitter")
+                        ? "X (Twitter)"
+                        : "Situs Resmi BPS Kota Batu"
                     }`}
                     whileHover={{ scale: 1.1, y: -2 }}
                     whileTap={{ scale: 0.95 }}
                     className={`w-11 h-11 ${social.color} rounded-lg flex items-center justify-center hover:shadow-lg transition-all duration-300`}
                   >
-                    <social.icon className="w-5 h-5 text-white" aria-hidden="true" />
+                    <social.icon
+                      className="w-5 h-5 text-white"
+                      aria-hidden="true"
+                    />
                   </motion.a>
                 ))}
               </div>
@@ -834,11 +840,9 @@ export default function HomePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                        <Image
-                          src="/logo-bps-optimized.svg"
+                        <img
+                          src="/logo-bps.png"
                           alt="BPS Logo"
-                          width={32}
-                          height={32}
                           className="w-8 h-8 object-contain"
                         />
                       </div>
@@ -905,7 +909,11 @@ export default function HomePage() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                            aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                            aria-label={
+                              showPassword
+                                ? "Sembunyikan password"
+                                : "Tampilkan password"
+                            }
                           >
                             {showPassword ? (
                               <EyeOff className="h-5 w-5 text-gray-400" />
@@ -1060,7 +1068,11 @@ export default function HomePage() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                            aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                            aria-label={
+                              showPassword
+                                ? "Sembunyikan password"
+                                : "Tampilkan password"
+                            }
                           >
                             {showPassword ? (
                               <EyeOff className="h-5 w-5 text-gray-400" />
