@@ -6,15 +6,24 @@ import { Toaster } from "react-hot-toast";
 import { SupabaseErrorBoundary } from "@/components/ui/SupabaseErrorBoundary";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ 
+  subsets: ["latin"],
+  display: 'swap', // Optimize font loading
+});
 
 export const metadata = {
   title: "BPS Kota Batu - 360° Feedback System",
   description: "Sistem Penilaian Kinerja Karyawan BPS Kota Batu",
   icons: {
-    icon: "/logo-bps.png",
-    shortcut: "/logo-bps.png",
-    apple: "/logo-bps.png",
+    icon: [
+      { url: "/logo-bps-optimized.svg", sizes: "32x32", type: "image/svg+xml" },
+      { url: "/logo-bps-optimized.svg", sizes: "16x16", type: "image/svg+xml" },
+    ],
+    shortcut: "/logo-bps-optimized.svg",
+    apple: "/logo-bps-optimized.svg",
+  },
+  other: {
+    'theme-color': '#1e40af',
   },
 };
 
@@ -32,6 +41,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to external domains for better performance */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+      </head>
       <body className={inter.className}>
         <SupabaseErrorBoundary>
           <ThemeProvider>

@@ -2,6 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, spring } from "framer-motion";
+import Image from "next/image";
 import {
   Home,
   BarChart3,
@@ -159,9 +160,11 @@ export function Navigation() {
               className="flex items-center space-x-3"
             >
               <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                <img
-                  src="/logo-bps.png"
+                <Image
+                  src="/logo-bps-optimized.svg"
                   alt="BPS Logo"
+                  width={32}
+                  height={32}
                   className="w-8 h-8 object-contain"
                 />
               </div>

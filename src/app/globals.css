@@ -1,6 +1,7 @@
 /* src/app/globals.css */
 @import "tailwindcss";
 
+/* Critical CSS - Load first */
 * {
   border-color: var(--color-border, currentColor);
 }
@@ -11,6 +12,7 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+/* Optimized utility classes */
 .glass-card {
   @apply bg-white/10 backdrop-blur-lg border border-white/20 shadow-xl;
 }
@@ -23,11 +25,7 @@ body {
   @apply transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl;
 }
 
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient 6s ease infinite;
-}
-
+/* Optimized scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -44,12 +42,29 @@ body {
   @apply from-blue-500 to-blue-700;
 }
 
-/* Smooth scrolling - Disabled on mobile */
-html {
-  scroll-behavior: smooth;
+/* Optimized scrolling - Disabled on mobile for better performance */
+@media (min-width: 768px) {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  .main-container {
+    scroll-snap-type: y proximity;
+    overflow-y: auto;
+    height: 100vh;
+    scroll-behavior: smooth;
+  }
+  
+  .section-snap {
+    scroll-snap-align: center;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
-/* Footer section specific styles */
+/* Optimized footer styles */
 .footer-section {
   scroll-snap-align: center;
   display: flex;
@@ -61,252 +76,76 @@ html {
   z-index: 1;
 }
 
-/* Ensure footer content is properly centered */
 .footer-section > div {
   width: 100%;
   max-width: 100%;
 }
 
-/* Remove any extra bottom spacing from footer */
 .footer-section *:last-child {
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
 }
 
-/* Ensure footer section takes exactly viewport height */
-.footer-section {
-  height: 100vh !important;
-  min-height: 100vh !important;
-  max-height: 100vh !important;
-  overflow: visible !important;
-  position: relative;
-  z-index: 1;
-}
-
-/* Allow content to be properly visible */
-.footer-section > * {
-  max-height: none !important;
-}
-
-/* Main container scroll behavior */
-.main-container {
-  scroll-snap-type: y proximity;
-  overflow-y: auto;
-  height: 100vh;
-  scroll-behavior: smooth;
-}
-
-/* Ensure sections can be scrolled to */
-.section-snap,
-.footer-section {
-  scroll-snap-align: start;
-  min-height: 100vh;
-  position: relative;
-}
-
-/* Section scroll snap */
-.section-snap {
-  scroll-snap-align: start;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Mobile-specific styles */
-@media (max-width: 768px) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  body {
-    overflow-x: hidden;
-  }
-
-  /* Prevent horizontal scrolling on mobile */
-  .overflow-x-hidden {
-    overflow-x: hidden;
-  }
-
-  /* Ensure proper touch scrolling */
-  * {
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Disable scroll snap on mobile */
-  .main-container {
-    scroll-snap-type: none;
-    overflow-y: auto;
-    height: auto;
-  }
-
-  .section-snap,
-  .footer-section {
-    scroll-snap-align: none;
-    min-height: auto;
-    height: auto !important;
-    max-height: none !important;
-    display: block;
-    overflow: visible !important;
-  }
-}
-
-/* Loading animation */
-.loading-dots {
-  display: inline-block;
-  position: relative;
-  width: 80px;
-  height: 80px;
-}
-
-.loading-dots div {
-  position: absolute;
-  top: 33px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: #3b82f6;
-  animation-timing-function: cubic-bezier(0, 1, 1, 0);
-}
-
-.loading-dots div:nth-child(1) {
-  left: 8px;
-  animation: loading-dots1 0.6s infinite;
-}
-
-.loading-dots div:nth-child(2) {
-  left: 8px;
-  animation: loading-dots2 0.6s infinite;
-}
-
-.loading-dots div:nth-child(3) {
-  left: 32px;
-  animation: loading-dots2 0.6s infinite;
-}
-
-.loading-dots div:nth-child(4) {
-  left: 56px;
-  animation: loading-dots3 0.6s infinite;
-}
-
-@keyframes loading-dots1 {
+/* Optimized animations */
+@keyframes gradient {
   0% {
-    transform: scale(0);
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
   }
   100% {
-    transform: scale(1);
+    background-position: 0% 50%;
   }
 }
 
-@keyframes loading-dots3 {
-  0% {
-    transform: scale(1);
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 6s ease infinite;
+}
+
+/* Optimized image loading */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Optimized focus styles for accessibility */
+*:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Optimized button styles */
+button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Optimized form styles */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Optimized loading states */
+.loading-skeleton {
+  @apply animate-pulse bg-gray-200 rounded;
+}
+
+/* Optimized responsive utilities */
+@media (max-width: 640px) {
+  .mobile-optimized {
+    font-size: 14px;
+    line-height: 1.4;
   }
-  100% {
-    transform: scale(0);
+}
+
+/* Optimized print styles */
+@media print {
+  .no-print {
+    display: none !important;
   }
-}
-
-@keyframes loading-dots2 {
-  0% {
-    transform: translate(0, 0);
-  }
-  100% {
-    transform: translate(24px, 0);
-  }
-}
-
-/* Dark mode classes */
-.dark {
-  color-scheme: dark;
-}
-
-.dark body {
-  @apply bg-gray-900 text-gray-100;
-}
-
-.dark .bg-white {
-  @apply bg-gray-800;
-}
-
-.dark .bg-gray-50 {
-  @apply bg-gray-700;
-}
-
-.dark .text-gray-900 {
-  @apply text-gray-100;
-}
-
-.dark .text-gray-800 {
-  @apply text-gray-200;
-}
-
-.dark .text-gray-700 {
-  @apply text-gray-300;
-}
-
-.dark .text-gray-600 {
-  @apply text-gray-400;
-}
-
-.dark .border-gray-200 {
-  @apply border-gray-700;
-}
-
-.dark .border-gray-300 {
-  @apply border-gray-600;
-}
-
-/* Dark mode gradients */
-.dark .gradient-text {
-  @apply bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent;
-}
-
-/* Dark mode hover states */
-.dark .hover\:bg-gray-50:hover {
-  @apply bg-gray-700;
-}
-
-.dark .hover\:bg-gray-100:hover {
-  @apply bg-gray-600;
-}
-
-/* Smooth transitions for theme changes */
-* {
-  transition: background-color 0.3s ease, border-color 0.3s ease,
-    color 0.3s ease;
-}
-
-/* Custom scrollbar */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e0 #f7fafc;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f7fafc;
-  border-radius: 3px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 3px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-/* Hide scrollbar utility */
-.scrollbar-hide {
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
-  scrollbar-width: none; /* Firefox */
-}
-
-.scrollbar-hide::-webkit-scrollbar {
-  display: none; /* Safari and Chrome */
 }

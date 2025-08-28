@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   BarChart3,
   Users,
@@ -330,10 +331,13 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-              <img
-                src="/logo-bps.png"
+              <Image
+                src="/logo-bps-optimized.svg"
                 alt="BPS Logo"
+                width={32}
+                height={32}
                 className="w-6 h-6 sm:w-8 sm:h-8 object-contain"
+                priority
               />
             </div>
             <div>
@@ -633,9 +637,11 @@ export default function HomePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-center space-x-3">
                 <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                  <img
-                    src="/logo-bps.png"
+                  <Image
+                    src="/logo-bps-optimized.svg"
                     alt="BPS Logo"
+                    width={40}
+                    height={40}
                     className="w-10 h-10 object-contain"
                   />
                 </div>
@@ -667,9 +673,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <MapPin className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-white font-semibold mb-1 text-sm">
+                <h4 className="text-white font-semibold mb-1 text-sm">
                   Alamat Kantor
-                </h3>
+                </h4>
                 <p className="text-gray-300 text-xs">
                   Jl. Melati No. 11.Songgokerto
                 </p>
@@ -686,9 +692,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Mail className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-white font-semibold mb-1 text-sm">
+                <h4 className="text-white font-semibold mb-1 text-sm">
                   Kontak
-                </h3>
+                </h4>
                 <p className="text-gray-300 text-xs">(0341) 512575</p>
                 <p className="text-gray-300 text-xs">bps3579@bps.go.id</p>
               </motion.div>
@@ -702,9 +708,9 @@ export default function HomePage() {
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                   <Clock className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-white font-semibold mb-1 text-sm">
+                <h4 className="text-white font-semibold mb-1 text-sm">
                   Jam Operasional
-                </h3>
+                </h4>
                 <p className="text-gray-300 text-xs">Senin - Jumat</p>
                 <p className="text-gray-300 text-xs">08:00 - 16:00 WIB</p>
               </motion.div>
@@ -828,9 +834,11 @@ export default function HomePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                        <img
-                          src="/logo-bps.png"
+                        <Image
+                          src="/logo-bps-optimized.svg"
                           alt="BPS Logo"
+                          width={32}
+                          height={32}
                           className="w-8 h-8 object-contain"
                         />
                       </div>
