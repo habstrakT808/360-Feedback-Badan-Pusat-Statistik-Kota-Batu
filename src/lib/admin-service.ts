@@ -261,7 +261,7 @@ export class AdminService {
       const totalEligibleUsers = eligibleUserIds.length
 
       // Fetch assignments for the active period only (guard when no active period)
-      let periodAssignments: Array<{ assessor_id: string; assessee_id: string; is_completed: boolean; period_id: string }>|null = null
+      let periodAssignments: Array<{ assessor_id: string; assessee_id: string; is_completed: boolean | null; period_id: string }>|null = null
       if (activePeriod?.id) {
         const { data, error: paError } = await supabase
           .from('assessment_assignments')

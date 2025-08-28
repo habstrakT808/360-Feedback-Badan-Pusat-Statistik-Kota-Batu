@@ -95,7 +95,31 @@ export default function TriwulanAssessmentPage() {
             setStep("waiting");
           }
         } else {
+          // If 5 or fewer candidates, automatically set shortlist and go to rating
           setShortlisted((cand || []).map((c: any) => c.user_id));
+          // Check if user has already completed ratings for all candidates
+          if (uid) {
+            try {
+              const existingMap = await TriwulanService.getUserRatingsMap(p.id, uid);
+              const allRated = (cand || []).every((c: any) => {
+                const ratings = existingMap[c.user_id];
+                return Array.isArray(ratings) && ratings.length === 13 && ratings.every(Boolean);
+              });
+              if (allRated) {
+                setStep("shortlist");
+              } else {
+                setStep("rate");
+                setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
+              }
+            } catch {
+              // If error checking ratings, default to rating step
+              setStep("rate");
+              setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
+            }
+          } else {
+            setStep("rate");
+            setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
+          }
         }
 
         // Load profile names for display
@@ -328,6 +352,29 @@ export default function TriwulanAssessmentPage() {
             Lihat Peringkat & Pemenang
           </Link>
         </div>
+
+        {/* Info message for 5 or fewer candidates */}
+        {candidates.length <= 5 && step === "select" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-200"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm text-blue-800 font-medium">
+                  Kandidat {candidates.length} orang - Langsung ke Penilaian
+                </p>
+                <p className="text-xs text-blue-600">
+                  Karena jumlah kandidat {candidates.length} orang (≤ 5), Anda akan langsung menilai semua kandidat tanpa perlu memilih.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {step === "select" && (
           <motion.div

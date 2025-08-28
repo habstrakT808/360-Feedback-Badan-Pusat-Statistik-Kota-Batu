@@ -681,11 +681,14 @@ export class SmartNotificationServiceImproved {
       if (!pinPeriod) return null
 
       // Check if user has already submitted pins this period
+      // Pin system uses `employee_pins` without explicit period linkage.
+      // Infer period by date range from active `pin_periods`.
       const { data: existingPins } = await supabase
-        .from('pins')
+        .from('employee_pins')
         .select('id')
-        .eq('user_id', userId)
-        .eq('period_id', pinPeriod.id)
+        .eq('giver_id', userId)
+        .gte('given_at', pinPeriod.start_date)
+        .lte('given_at', pinPeriod.end_date)
 
       if (existingPins && existingPins.length > 0) return null
 
@@ -720,6 +723,7 @@ export class SmartNotificationServiceImproved {
   private static async checkTriwulanReminders(userId: string): Promise<any | null> {
     try {
       // Get active triwulan period
+      // Get active triwulan period
       const { data: triwulanPeriod } = await supabase
         .from('triwulan_periods')
         .select('*')
@@ -729,13 +733,16 @@ export class SmartNotificationServiceImproved {
       if (!triwulanPeriod) return null
 
       // Check if user has already submitted triwulan this period
-      const { data: existingTriwulan } = await supabase
-        .from('triwulan_assessments')
-        .select('id')
-        .eq('user_id', userId)
+      // Consider user done if has completed triwulan vote for active period
+      const { data: voteDone } = await supabase
+        .from('triwulan_vote_completion')
+        .select('completed')
         .eq('period_id', triwulanPeriod.id)
+        .eq('voter_id', userId)
+        .eq('completed', true)
+        .maybeSingle()
 
-      if (existingTriwulan && existingTriwulan.length > 0) return null
+      if (voteDone && voteDone.completed === true) return null
 
       // Calculate days left
       const daysLeft = Math.ceil(

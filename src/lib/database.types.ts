@@ -604,6 +604,222 @@ export type Database = {
           },
         ]
       }
+      triwulan_periods: {
+        Row: {
+          id: string
+          year: number
+          quarter: number
+          start_date: string
+          end_date: string
+          is_active: boolean | null
+          is_completed: boolean | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          year: number
+          quarter: number
+          start_date: string
+          end_date: string
+          is_active?: boolean | null
+          is_completed?: boolean | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          year?: number
+          quarter?: number
+          start_date?: string
+          end_date?: string
+          is_active?: boolean | null
+          is_completed?: boolean | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      triwulan_monthly_deficiencies: {
+        Row: {
+          period_id: string
+          user_id: string
+          year: number
+          month: number
+          deficiency_hours: number
+          filled_by: string | null
+        }
+        Insert: {
+          period_id: string
+          user_id: string
+          year: number
+          month: number
+          deficiency_hours: number
+          filled_by?: string | null
+        }
+        Update: {
+          period_id?: string
+          user_id?: string
+          year?: number
+          month?: number
+          deficiency_hours?: number
+          filled_by?: string | null
+        }
+        Relationships: []
+      }
+      triwulan_candidates: {
+        Row: {
+          period_id: string
+          user_id: string
+        }
+        Insert: {
+          period_id: string
+          user_id: string
+        }
+        Update: {
+          period_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      triwulan_votes: {
+        Row: {
+          period_id: string
+          voter_id: string
+          candidate_id: string
+          created_at: string | null
+        }
+        Insert: {
+          period_id: string
+          voter_id: string
+          candidate_id: string
+          created_at?: string | null
+        }
+        Update: {
+          period_id?: string
+          voter_id?: string
+          candidate_id?: string
+          created_at?: string | null
+        }
+        Relationships: []
+      }
+      triwulan_vote_completion: {
+        Row: {
+          period_id: string
+          voter_id: string
+          completed: boolean
+          completed_at: string | null
+        }
+        Insert: {
+          period_id: string
+          voter_id: string
+          completed?: boolean
+          completed_at?: string | null
+        }
+        Update: {
+          period_id?: string
+          voter_id?: string
+          completed?: boolean
+          completed_at?: string | null
+        }
+        Relationships: []
+      }
+      triwulan_ratings: {
+        Row: {
+          period_id: string
+          rater_id: string
+          candidate_id: string
+          c1: number | null
+          c2: number | null
+          c3: number | null
+          c4: number | null
+          c5: number | null
+          c6: number | null
+          c7: number | null
+          c8: number | null
+          c9: number | null
+          c10: number | null
+          c11: number | null
+          c12: number | null
+          c13: number | null
+        }
+        Insert: {
+          period_id: string
+          rater_id: string
+          candidate_id: string
+          c1?: number | null
+          c2?: number | null
+          c3?: number | null
+          c4?: number | null
+          c5?: number | null
+          c6?: number | null
+          c7?: number | null
+          c8?: number | null
+          c9?: number | null
+          c10?: number | null
+          c11?: number | null
+          c12?: number | null
+          c13?: number | null
+        }
+        Update: {
+          period_id?: string
+          rater_id?: string
+          candidate_id?: string
+          c1?: number | null
+          c2?: number | null
+          c3?: number | null
+          c4?: number | null
+          c5?: number | null
+          c6?: number | null
+          c7?: number | null
+          c8?: number | null
+          c9?: number | null
+          c10?: number | null
+          c11?: number | null
+          c12?: number | null
+          c13?: number | null
+        }
+        Relationships: []
+      }
+      triwulan_candidate_scores: {
+        Row: {
+          period_id: string
+          candidate_id: string
+          total_score: number | null
+          num_raters: number | null
+          score_percent: number | null
+        }
+        Insert: {
+          period_id: string
+          candidate_id: string
+          total_score?: number | null
+          num_raters?: number | null
+          score_percent?: number | null
+        }
+        Update: {
+          period_id?: string
+          candidate_id?: string
+          total_score?: number | null
+          num_raters?: number | null
+          score_percent?: number | null
+        }
+        Relationships: []
+      }
+      triwulan_winners: {
+        Row: {
+          period_id: string
+          winner_id: string
+          total_score: number | null
+        }
+        Insert: {
+          period_id: string
+          winner_id: string
+          total_score?: number | null
+        }
+        Update: {
+          period_id?: string
+          winner_id?: string
+          total_score?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

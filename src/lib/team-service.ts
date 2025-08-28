@@ -27,7 +27,7 @@ export class TeamService {
       // Fallback: use hardcoded admin IDs if query fails
       adminUserIds = ['dccdb786-d7e7-44a8-a4d0-e446623c19b9'] // Hafiyan's ID
     } else {
-      adminUserIds = adminUsers?.map(u => u.user_id) || []
+      adminUserIds = (adminUsers || []).map(u => u.user_id).filter((id): id is string => !!id)
     }
 
     // Additional fallback: filter by known admin email/name patterns
@@ -94,7 +94,7 @@ export class TeamService {
       // Fallback: use hardcoded admin IDs if query fails
       adminUserIds = ['dccdb786-d7e7-44a8-a4d0-e446623c19b9'] // Hafiyan's ID
     } else {
-      adminUserIds = adminUsers?.map(u => u.user_id) || []
+      adminUserIds = (adminUsers || []).map(u => u.user_id).filter((id): id is string => !!id)
     }
 
     // Group by employee
@@ -209,7 +209,7 @@ export class TeamService {
       // Fallback: use hardcoded admin IDs if query fails
       adminUserIds = ['dccdb786-d7e7-44a8-a4d0-e446623c19b9'] // Hafiyan's ID
     } else {
-      adminUserIds = adminUsers?.map(u => u.user_id) || []
+      adminUserIds = (adminUsers || []).map(u => u.user_id).filter((id): id is string => !!id)
     }
 
     // Filter out assignments involving admin users

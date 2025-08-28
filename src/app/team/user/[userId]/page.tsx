@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { TeamService } from "@/lib/team-service";
 import { toast } from "react-hot-toast";
 import { FloatingComments } from "@/components/team/FloatingComments";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   ArrowLeft,
   Star,
@@ -52,6 +53,7 @@ export default function PublicProfilePage() {
   const params = useParams();
   const router = useRouter();
   const userId = params.userId as string;
+  const { isSupervisor, isLoading: roleLoading } = useUserRole();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [performance, setPerformance] = useState<PerformanceData | null>(null);
@@ -79,8 +81,8 @@ export default function PublicProfilePage() {
 
       if (profileError) throw profileError;
 
-      // Check if user allows public view
-      if (!profileData.allow_public_view) {
+      // Check if user allows public view OR if current user is supervisor
+      if (!profileData.allow_public_view && !isSupervisor) {
         setError("Profil ini bersifat privat");
         setIsLoading(false);
         return;
@@ -181,7 +183,7 @@ export default function PublicProfilePage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || roleLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-screen">
@@ -201,7 +203,10 @@ export default function PublicProfilePage() {
               Profil Tidak Tersedia
             </h2>
             <p className="text-gray-600 mb-4">
-              {error || "Profil ini bersifat privat atau tidak ditemukan"}
+              {isSupervisor 
+                ? (error || "Profil ini tidak ditemukan atau telah dihapus")
+                : "Profil ini bersifat privat dan hanya dapat diakses oleh supervisor"
+              }
             </p>
             <button
               onClick={() => router.back()}
@@ -272,9 +277,24 @@ export default function PublicProfilePage() {
               </div>
 
               <div className="text-right">
-                <div className="flex items-center space-x-2 text-green-300 mb-2">
-                  <Globe className="w-4 h-4" />
-                  <span className="text-sm">Profil Publik</span>
+                <div className={`flex items-center space-x-2 mb-2 ${
+                  profile.allow_public_view 
+                    ? "text-green-300" 
+                    : "text-yellow-300"
+                }`}>
+                  {profile.allow_public_view ? (
+                    <Globe className="w-4 h-4" />
+                  ) : (
+                    <Lock className="w-4 h-4" />
+                  )}
+                  <span className="text-sm">
+                    {profile.allow_public_view 
+                      ? "Profil Publik" 
+                      : isSupervisor 
+                        ? "Profil Privat (Supervisor Access)" 
+                        : "Profil Privat"
+                    }
+                  </span>
                 </div>
                 <div className="text-3xl font-bold">
                   {performance?.averageRating && performance.averageRating > 0

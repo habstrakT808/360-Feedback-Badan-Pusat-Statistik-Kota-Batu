@@ -37,10 +37,14 @@ export default function PinsPage() {
     "give"
   );
   const [selectedUser, setSelectedUser] = useState<PinRanking | null>(null);
+  const currentWeek = PinService.getCurrentWeekNumber();
+  const currentYear = PinService.getCurrentYear();
+  const currentMonth = PinService.getCurrentMonth();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activePinPeriod, setActivePinPeriod] = useState<any | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(currentMonth);
+  const [selectedYear, setSelectedYear] = useState<number | null>(currentYear);
 
   useEffect(() => {
     if (isAdmin) {
@@ -123,9 +127,6 @@ export default function PinsPage() {
     setSelectedUser(null);
   };
 
-  const currentWeek = PinService.getCurrentWeekNumber();
-  const currentYear = PinService.getCurrentYear();
-  const currentMonth = PinService.getCurrentMonth();
   const todayStr = new Date().toISOString().slice(0, 10);
   const isWithinActivePinPeriod = !!(
     activePinPeriod &&

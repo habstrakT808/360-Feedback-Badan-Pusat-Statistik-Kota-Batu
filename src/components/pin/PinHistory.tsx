@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, Calendar, User, Clock, XCircle } from "lucide-react";
+import { Pin, Calendar, User, Clock, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { PinService } from "@/lib/pin-service";
 import { useStore } from "@/store/useStore";
@@ -24,11 +24,19 @@ interface PinHistoryProps {
 }
 
 export function PinHistory({ onAfterCancel }: PinHistoryProps) {
+  const getCurrentMonth = () => PinService.getCurrentMonth();
+  const getCurrentYear = () => PinService.getCurrentYear();
+  
   const [pinHistory, setPinHistory] = useState<PinHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(getCurrentMonth());
+  const [selectedYear, setSelectedYear] = useState<number | null>(getCurrentYear());
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+  
   const { user } = useStore();
 
   useEffect(() => {
@@ -36,6 +44,11 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
       loadPinHistory();
     }
   }, [user?.id, selectedMonth, selectedYear]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedMonth, selectedYear]);
 
   const loadPinHistory = async () => {
     try {
@@ -50,6 +63,28 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
       console.error("Error loading pin history:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Pagination calculations
+  const totalPages = Math.ceil(pinHistory.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentPageItems = pinHistory.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
     }
   };
 
@@ -99,8 +134,20 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
     return `${months[month - 1]}, ${year}`;
   };
 
-  const getCurrentMonth = () => PinService.getCurrentMonth();
-  const getCurrentYear = () => PinService.getCurrentYear();
+  // Check if a pin can be cancelled based on period status
+  const canCancelPin = (month: number, year: number) => {
+    const currentMonth = getCurrentMonth();
+    const currentYear = getCurrentYear();
+
+    // Check if the pin is from the current month and year
+    if (month === currentMonth && year === currentYear) {
+      // For current month, allow cancellation (assuming period is still active)
+      return true;
+    }
+
+    // For pins from previous months/years, they cannot be cancelled
+    return false;
+  };
 
   const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
   const yearOptions = Array.from(
@@ -216,71 +263,127 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          <AnimatePresence>
-            {pinHistory.map((pin, index) => (
-              <motion.div
-                key={`pin-${pin.id}-${index}`} // Gunakan kombinasi ID dan index
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-              >
-                {/* Receiver Avatar */}
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold">
-                  {pin.receiver?.avatar_url ? (
-                    <img
-                      src={pin.receiver.avatar_url}
-                      alt={pin.receiver?.full_name || "Pengguna"}
-                      className="w-full h-full rounded-xl object-cover"
-                    />
-                  ) : (
-                    getInitials(pin.receiver?.full_name || "Tidak diketahui")
-                  )}
+        <>
+          <div className="space-y-4">
+            <AnimatePresence>
+              {currentPageItems.map((pin, index) => (
+                <motion.div
+                  key={`pin-${pin.id}-${index}`}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  {/* Receiver Avatar */}
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold">
+                    {pin.receiver?.avatar_url ? (
+                      <img
+                        src={pin.receiver.avatar_url}
+                        alt={pin.receiver?.full_name || "Pengguna"}
+                        className="w-full h-full rounded-xl object-cover"
+                      />
+                    ) : (
+                      getInitials(pin.receiver?.full_name || "Tidak diketahui")
+                    )}
+                  </div>
+
+                  {/* Pin Info */}
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <Pin className="w-4 h-4 text-red-500" />
+                      <span className="text-sm text-red-600 font-medium">
+                        Pin diberikan kepada
+                      </span>
+                    </div>
+                    <h4 className="font-semibold text-gray-900">
+                      {pin.receiver?.full_name || "Pengguna tidak ditemukan"}
+                    </h4>
+                    <div className="flex items-center space-x-4 text-sm text-gray-500">
+                      <span>
+                        {getMonthLabel(
+                          (pin as any).month ||
+                            new Date(pin.created_at).getMonth() + 1,
+                          pin.year
+                        )}
+                      </span>
+                      <span>•</span>
+                      <span>{formatDate(pin.created_at)}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center space-x-2">
+                    {canCancelPin((pin as any).month || new Date(pin.created_at).getMonth() + 1, pin.year) ? (
+                      <button
+                        onClick={() => handleCancel(pin.id)}
+                        disabled={isCancelling === pin.id}
+                        className="px-3 py-2 text-sm bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center space-x-2"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>
+                          {isCancelling === pin.id ? "Membatalkan..." : "Batal"}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="px-3 py-2 text-sm bg-gray-50 text-gray-500 border border-gray-200 rounded-lg">
+                        Periode Selesai
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Menampilkan {startIndex + 1}-{Math.min(endIndex, pinHistory.length)} dari {pinHistory.length} riwayat
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {/* Previous Button */}
+                <button
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Sebelumnya</span>
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                        currentPage === page
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Pin Info */}
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <Pin className="w-4 h-4 text-red-500" />
-                    <span className="text-sm text-red-600 font-medium">
-                      Pin diberikan kepada
-                    </span>
-                  </div>
-                  <h4 className="font-semibold text-gray-900">
-                    {pin.receiver?.full_name || "Pengguna tidak ditemukan"}
-                  </h4>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <span>
-                      {getMonthLabel(
-                        (pin as any).month ||
-                          new Date(pin.created_at).getMonth() + 1,
-                        pin.year
-                      )}
-                    </span>
-                    <span>•</span>
-                    <span>{formatDate(pin.created_at)}</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleCancel(pin.id)}
-                    disabled={isCancelling === pin.id}
-                    className="px-3 py-2 text-sm bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 disabled:opacity-50 flex items-center space-x-2"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>
-                      {isCancelling === pin.id ? "Membatalkan..." : "Batal"}
-                    </span>
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+                {/* Next Button */}
+                <button
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  <span>Selanjutnya</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -33,7 +33,7 @@ export function useUserRole() {
           // Fallback to database function
           try {
             const { data: functionData, error: functionError } = await supabase
-              .rpc('get_current_user_role')
+              .rpc('check_user_role', { user_uuid: user.id })
             
             if (functionError) {
               console.error('Function role check error:', functionError)
