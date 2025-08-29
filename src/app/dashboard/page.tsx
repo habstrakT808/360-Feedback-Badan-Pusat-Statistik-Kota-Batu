@@ -5,7 +5,7 @@ import { motion, Variants, spring } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useUserRole } from "@/hooks/useUserRole";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { ExportButton } from "@/components/export/ExportButton";
+import { AdminExportButton } from "@/components/export/AdminExportButton";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { DashboardService, DashboardStats } from "@/lib/dashboard-service";
 import { SmartNotificationServiceImproved } from "@/lib/smart-notification-service";
@@ -182,15 +182,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center space-x-3">
               <NotificationBell />
-              <ExportButton
-                data={{
-                  overallStats: stats,
-                  period: stats.currentPeriod,
-                }}
-                type="summary"
-                title="Dashboard Summary"
-                variant="secondary"
-              />
+              <AdminExportButton variant="outline" size="sm" />
               {stats.currentPeriodData && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}

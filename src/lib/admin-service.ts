@@ -7,6 +7,20 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 type AssessmentPeriod = Database['public']['Tables']['assessment_periods']['Row']
 
 export class AdminService {
+  // Check if current user is admin
+  static async isCurrentUserAdmin(): Promise<boolean> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const { adminIds } = await RolesService.getRoleUserIds();
+      return adminIds.includes(user.id);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  }
+
   // User Management
   static async getAllUsers() {
     const { data, error } = await supabase
@@ -45,15 +59,27 @@ export class AdminService {
   }
 
   static async updateUser(userId: string, updates: Partial<Profile>) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId)
-      .select()
-      .single()
+    try {
+      // Check if current user is admin
+      const isAdmin = await this.isCurrentUserAdmin();
+      if (!isAdmin) {
+        throw new Error('Admin access required');
+      }
 
-    if (error) throw error
-    return data
+      // Update profile directly
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw new Error('Failed to update user');
+    }
   }
 
   static async deleteUser(userId: string) {
@@ -63,9 +89,125 @@ export class AdminService {
   }
 
   static async resetUserPassword(userId: string) {
-    // Note: This requires admin privileges and should be done server-side
-    console.warn('resetUserPassword should be implemented server-side')
-    return { url: 'placeholder' }
+    try {
+      // Check if current user is admin
+      const isAdmin = await this.isCurrentUserAdmin();
+      if (!isAdmin) {
+        throw new Error('Admin access required');
+      }
+
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Call API endpoint to reset password
+      const response = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to reset password');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to reset password');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error resetting user password:', error);
+      throw new Error('Failed to reset user password');
+    }
+  }
+
+  static async updateUserEmail(userId: string, newEmail: string) {
+    try {
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Check if current user is admin
+      const isAdmin = await this.isCurrentUserAdmin();
+      if (!isAdmin) {
+        throw new Error('Admin access required');
+      }
+
+      // Call API endpoint to update email
+      const response = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId, newEmail })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update email');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update email');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user email:', error);
+      throw new Error('Failed to update user email');
+    }
+  }
+
+  static async updateUserPassword(userId: string, newPassword: string) {
+    try {
+      // Check if current user is admin
+      const isAdmin = await this.isCurrentUserAdmin();
+      if (!isAdmin) {
+        throw new Error('Admin access required');
+      }
+
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Call API endpoint to update password
+      const response = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId, newPassword })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update password');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update password');
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user password:', error);
+      throw new Error('Failed to update user password');
+    }
   }
 
   // Period Management

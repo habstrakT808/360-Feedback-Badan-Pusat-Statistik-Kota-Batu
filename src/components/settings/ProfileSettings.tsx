@@ -60,9 +60,14 @@ export function ProfileSettings({ profile, onUpdate }: ProfileSettingsProps) {
 
       // Handle email change separately if changed
       if (data.email !== profile.email) {
-        // Note: Email update functionality would be implemented here
-        // For now, we'll just show a success message
-        toast.success("Email verifikasi telah dikirim ke email baru Anda");
+        try {
+          // Use direct email update to bypass confirmation
+          await SettingsService.updateEmailDirectly(user.id, data.email);
+          toast.success("Email berhasil diperbarui tanpa konfirmasi");
+        } catch (error: any) {
+          toast.error(error.message || "Gagal memperbarui email");
+          return; // Don't update profile if email update fails
+        }
       }
 
       onUpdate(updatedProfile);

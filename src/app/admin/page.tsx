@@ -20,14 +20,18 @@ import {
 import { toast } from "react-hot-toast";
 import { AdminGuard } from "@/components/auth/AdminGuard";
 import { CreatePeriodModal } from "@/components/admin/CreatePeriodModal";
+import { EditUserModal } from "@/components/admin/EditUserModal";
 import { PinPeriodAdmin } from "@/components/admin/PinPeriodAdmin";
 import { TriwulanPeriodAdmin } from "@/components/admin/TriwulanPeriodAdmin";
+import { AdminExportButton } from "@/components/export/AdminExportButton";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatePeriodModalOpen, setIsCreatePeriodModalOpen] = useState(false);
+  const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   useEffect(() => {
     loadStats();
@@ -59,7 +63,8 @@ export default function AdminPage() {
   };
 
   const handleEditUser = (user: any) => {
-    toast.success("Edit user modal will be implemented");
+    setSelectedUser(user);
+    setIsEditUserModalOpen(true);
   };
 
   const handleCreatePeriod = () => {
@@ -72,6 +77,11 @@ export default function AdminPage() {
 
   const handlePeriodCreated = () => {
     // Refresh stats after creating a new period
+    loadStats();
+  };
+
+  const handleUserUpdated = () => {
+    // Refresh stats after updating a user
     loadStats();
   };
 
@@ -107,6 +117,9 @@ export default function AdminPage() {
                   System management and administration
                 </p>
               </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <AdminExportButton variant="primary" size="md" />
             </div>
           </motion.div>
 
@@ -208,6 +221,17 @@ export default function AdminPage() {
         isOpen={isCreatePeriodModalOpen}
         onClose={() => setIsCreatePeriodModalOpen(false)}
         onSuccess={handlePeriodCreated}
+      />
+
+      {/* Edit User Modal */}
+      <EditUserModal
+        user={selectedUser}
+        isOpen={isEditUserModalOpen}
+        onClose={() => {
+          setIsEditUserModalOpen(false);
+          setSelectedUser(null);
+        }}
+        onUserUpdated={handleUserUpdated}
       />
     </AdminGuard>
   );

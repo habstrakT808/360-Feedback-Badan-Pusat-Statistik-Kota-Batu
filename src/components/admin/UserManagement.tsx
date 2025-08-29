@@ -89,9 +89,13 @@ export function UserManagement({
   };
 
   const handleResetPassword = async (userId: string) => {
+    if (!confirm("Reset password user ini ke '12345678'?")) {
+      return;
+    }
+
     try {
       await AdminService.resetUserPassword(userId);
-      toast.success("Password reset link sent");
+      toast.success("Password berhasil direset ke '12345678'");
     } catch (error: any) {
       toast.error("Failed to reset password: " + error.message);
     }

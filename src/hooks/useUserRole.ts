@@ -30,26 +30,13 @@ export function useUserRole() {
 
         if (error) {
           console.error('Role check error:', error)
-          // Fallback to database function
-          try {
-            const { data: functionData, error: functionError } = await supabase
-              .rpc('check_user_role', { user_uuid: user.id })
-            
-            if (functionError) {
-              console.error('Function role check error:', functionError)
-              setIsAdmin(false)
-              setIsSupervisor(false)
-            } else {
-              const role = functionData || 'user'
-              console.log('🔍 Function role result:', role)
-              setIsAdmin(role === 'admin')
-              setIsSupervisor(role === 'supervisor')
-            }
-          } catch (functionException) {
-            console.error('Function role check exception:', functionException)
-            setIsAdmin(false)
-            setIsSupervisor(false)
-          }
+          // Fallback to environment variables and hardcoded IDs
+          const { adminIds, supervisorIds } = await import('@/lib/roles-service').then(m => m.RolesService.getRoleUserIds())
+          
+          console.log('🔍 Environment role check:', { adminIds, supervisorIds, userId: user.id })
+          
+          setIsAdmin(adminIds.includes(user.id))
+          setIsSupervisor(supervisorIds.includes(user.id))
         } else {
           // If we got data from user_roles table
           const role = data?.role || 'user'
