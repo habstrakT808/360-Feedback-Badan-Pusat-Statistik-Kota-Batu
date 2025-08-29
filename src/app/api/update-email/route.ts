@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Email berhasil diperbarui tanpa konfirmasi' 
+      message: 'Email berhasil diperbarui' 
     });
 
   } catch (error: any) {

@@ -1,9 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+
+// Create admin client for server-side operations
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export async function POST(request: NextRequest) {
   try {
+    // Debug: Log environment variables
+    console.log('Reset Password - Environment check:', {
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set',
+      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set'
+    });
+
     const { userId } = await request.json();
 
     // Get the current admin user
@@ -19,16 +36,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if current user is admin
-    const { data: userRole, error: roleError } = await supabase
+    // Check if current user is admin using service role (bypass RLS)
+    console.log('Reset Password - Checking admin role for user:', user.id);
+    
+    const { data: userRole, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .single();
 
+    console.log('Reset Password - Role check result:', { userRole, roleError });
+
     if (roleError || userRole?.role !== 'admin') {
+      console.log('Reset Password - Admin access denied for user:', user.id);
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
+
+    console.log('Reset Password - Admin access granted for user:', user.id);
 
     // Reset password to default: 12345678
     const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(userId, {

@@ -63,7 +63,7 @@ export function ProfileSettings({ profile, onUpdate }: ProfileSettingsProps) {
         try {
           // Use direct email update to bypass confirmation
           await SettingsService.updateEmailDirectly(user.id, data.email);
-          toast.success("Email berhasil diperbarui tanpa konfirmasi");
+          toast.success("Email berhasil diperbarui");
         } catch (error: any) {
           toast.error(error.message || "Gagal memperbarui email");
           return; // Don't update profile if email update fails
