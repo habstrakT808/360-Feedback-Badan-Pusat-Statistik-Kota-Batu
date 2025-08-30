@@ -81,11 +81,17 @@ async function getAssessmentData(periodFilter: string, startDate?: string, endDa
 
   if (error) throw error;
 
+  // Get supervisor IDs for proper categorization
+  const { supervisorIds } = await RolesService.getRoleUserIds();
+
   // Transform data for export
   return data?.map(assignment => {
     const responses = assignment.feedback_responses || [];
     const totalRating = responses.reduce((sum: number, r: any) => sum + (r.rating || 0), 0);
     const averageRating = responses.length > 0 ? totalRating / responses.length : 0;
+
+    // Determine if this is a supervisor assessment
+    const isSupervisorAssessment = supervisorIds.includes(assignment.assessor?.id);
 
     return {
       // Assignment Info
@@ -105,6 +111,7 @@ async function getAssessmentData(periodFilter: string, startDate?: string, endDa
       assessor_email: assignment.assessor?.email,
       assessor_position: assignment.assessor?.position,
       assessor_department: assignment.assessor?.department,
+      is_supervisor_assessment: isSupervisorAssessment,
 
       // Assessee Info
       assessee_id: assignment.assessee?.id,

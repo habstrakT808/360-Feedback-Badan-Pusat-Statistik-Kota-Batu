@@ -83,9 +83,44 @@ export class AdminService {
   }
 
   static async deleteUser(userId: string) {
-    // Note: This requires admin privileges and should be done server-side
-    console.warn('deleteUser should be implemented server-side')
-    return true
+    try {
+      // Check if current user is admin
+      const isAdmin = await this.isCurrentUserAdmin();
+      if (!isAdmin) {
+        throw new Error('Admin access required');
+      }
+
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Call API endpoint to delete user
+      const response = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete user');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete user');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw new Error('Failed to delete user');
+    }
   }
 
   static async resetUserPassword(userId: string) {
@@ -561,15 +596,43 @@ export class AdminService {
   }
 
   static async bulkDeleteUsers(userIds: string[]) {
-    const results = []
-    for (const userId of userIds) {
-      try {
-        await this.deleteUser(userId)
-        results.push({ success: true, userId })
-      } catch (error: any) {
-        results.push({ success: false, error: error.message, userId })
+    try {
+      // Check if current user is admin
+      const isAdmin = await this.isCurrentUserAdmin();
+      if (!isAdmin) {
+        throw new Error('Admin access required');
       }
+
+      // Get current session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      // Call API endpoint to bulk delete users
+      const response = await fetch('/api/admin/bulk-delete-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userIds })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to bulk delete users');
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to bulk delete users');
+      }
+
+      return result.results;
+    } catch (error) {
+      console.error('Error in bulk delete users:', error);
+      throw new Error('Failed to bulk delete users');
     }
-    return results
   }
 }
