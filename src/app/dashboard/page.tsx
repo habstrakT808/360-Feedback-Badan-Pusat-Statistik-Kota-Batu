@@ -28,7 +28,7 @@ import {
 export default function Dashboard() {
   const router = useRouter();
   const { user } = useStore();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isSupervisor } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
     totalEmployees: 0,
     completedAssessments: 0,
@@ -348,26 +348,28 @@ export default function Dashboard() {
               </div>
             </motion.div>
 
-            <motion.div
-              whileHover={{ scale: 1.02, y: -4 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => router.push("/my-results")}
-              className="group bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl p-6 shadow-lg cursor-pointer hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <Award className="w-8 h-8" />
-                  <ArrowRight className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" />
+            {!isSupervisor && (
+              <motion.div
+                whileHover={{ scale: 1.02, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => router.push("/my-results")}
+                className="group bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl p-6 shadow-lg cursor-pointer hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <Award className="w-8 h-8" />
+                    <ArrowRight className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Lihat Hasil Saya</h3>
+                  <p className="text-green-100">
+                    {stats.averageRating > 0
+                      ? `Rata-rata rating Anda: ${stats.averageRating}/10`
+                      : "Belum ada feedback yang diterima"}
+                  </p>
                 </div>
-                <h3 className="text-xl font-bold mb-2">Lihat Hasil Saya</h3>
-                <p className="text-green-100">
-                  {stats.averageRating > 0
-                    ? `Rata-rata rating Anda: ${stats.averageRating}/10`
-                    : "Belum ada feedback yang diterima"}
-                </p>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
 
             <motion.div
               whileHover={{ scale: 1.02, y: -4 }}

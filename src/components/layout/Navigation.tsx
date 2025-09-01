@@ -119,6 +119,13 @@ export function Navigation() {
 
   // Combine navigation based on user role
   const allNavigation = isAdmin ? adminNavigation : navigation;
+  
+  // Filter navigation for supervisors (hide "Hasil Saya")
+  const filteredNavigation = isSupervisor 
+    ? navigation.filter(item => item.name !== "Hasil Saya")
+    : navigation;
+    
+  const finalNavigation = isAdmin ? adminNavigation : filteredNavigation;
 
   return (
     <>
@@ -235,7 +242,7 @@ export function Navigation() {
 
           {/* Navigation */}
           <nav className="flex-1 px-6 pb-6 space-y-2 overflow-y-auto custom-scrollbar">
-            {allNavigation.map((item, index) => {
+            {finalNavigation.map((item, index) => {
               const hasChildren = Array.isArray((item as any).children);
               if (hasChildren) {
                 const children = (item as any).children as Array<{

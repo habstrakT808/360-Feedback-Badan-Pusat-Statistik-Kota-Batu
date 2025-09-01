@@ -36,7 +36,7 @@ const ASPECT_NAMES: Record<string, string> = {
 export default function MyResultsPage() {
   const { user } = useStore();
   const router = useRouter();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, isSupervisor } = useUserRole();
   const [results, setResults] = useState<any[]>([]);
   const [weightedData, setWeightedData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,8 +45,10 @@ export default function MyResultsPage() {
   useEffect(() => {
     if (isAdmin) {
       router.replace("/admin");
+    } else if (isSupervisor) {
+      router.replace("/dashboard");
     }
-  }, [isAdmin, router]);
+  }, [isAdmin, isSupervisor, router]);
 
   useEffect(() => {
     if (user) {

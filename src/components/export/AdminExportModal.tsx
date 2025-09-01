@@ -5,9 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   Download,
-  FileText,
-  Table,
-  File,
   Calendar,
   Users,
   User,
@@ -44,7 +41,7 @@ interface ExportOptions {
   startDate?: string;
   endDate?: string;
   selectedPeriod?: string;
-  format: "excel" | "csv";
+  format: "excel";
   includeUserDetails: boolean;
   includePeriodDetails: boolean;
 }
@@ -186,23 +183,6 @@ export function AdminExportModal({ isOpen, onClose }: AdminExportModalProps) {
       description: "Data pemenang triwulan dengan skor dan periode",
       icon: BarChart3,
       color: "bg-purple-100 text-purple-600",
-    },
-  ];
-
-  const formatOptions = [
-    {
-      id: "excel",
-      name: "Excel (.xlsx)",
-      description: "Format Excel dengan multiple sheet dan formatting",
-      icon: Table,
-      color: "bg-green-100 text-green-600",
-    },
-    {
-      id: "csv",
-      name: "CSV (.csv)",
-      description: "Format CSV untuk analisis data",
-      icon: File,
-      color: "bg-blue-100 text-blue-600",
     },
   ];
 
@@ -383,45 +363,6 @@ export function AdminExportModal({ isOpen, onClose }: AdminExportModalProps) {
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* Format Selection */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Format Export
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {formatOptions.map((option) => (
-                      <button
-                        key={option.id}
-                        onClick={() =>
-                          setExportOptions((prev) => ({
-                            ...prev,
-                            format: option.id as any,
-                          }))
-                        }
-                        className={`p-4 rounded-xl border-2 transition-all ${
-                          exportOptions.format === option.id
-                            ? "border-purple-500 bg-purple-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-lg ${option.color}`}>
-                            <option.icon className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <h4 className="font-semibold text-gray-900">
-                              {option.name}
-                            </h4>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {option.description}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
                   </div>
                 </div>
 
