@@ -2,9 +2,18 @@
 "use client";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, Calendar, User, Clock, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Pin,
+  Calendar,
+  User,
+  Clock,
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { PinService } from "@/lib/pin-service";
+import { PinPeriodService } from "@/lib/pin-period-service";
 import { useStore } from "@/store/useStore";
 
 interface PinHistoryItem {
@@ -20,23 +29,23 @@ interface PinHistoryItem {
 }
 
 interface PinHistoryProps {
-  onAfterCancel?: () => void;
+  onAfterCancel?: (newPinsRemaining?: number) => void;
 }
 
 export function PinHistory({ onAfterCancel }: PinHistoryProps) {
   const getCurrentMonth = () => PinService.getCurrentMonth();
   const getCurrentYear = () => PinService.getCurrentYear();
-  
+
   const [pinHistory, setPinHistory] = useState<PinHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(getCurrentMonth());
-  const [selectedYear, setSelectedYear] = useState<number | null>(getCurrentYear());
-  
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
-  
+
   const { user } = useStore();
 
   useEffect(() => {
@@ -44,6 +53,23 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
       loadPinHistory();
     }
   }, [user?.id, selectedMonth, selectedYear]);
+
+  // Sinkronkan default filter dengan periode aktif saat komponen mount
+  useEffect(() => {
+    const syncActivePeriod = async () => {
+      try {
+        const active = await PinPeriodService.getActive();
+        if (active && (selectedMonth === null || selectedYear === null)) {
+          setSelectedMonth(active.month ?? getCurrentMonth());
+          setSelectedYear(active.year ?? getCurrentYear());
+        }
+      } catch (e) {
+        // fallback diam2: biarkan default current month/year
+      }
+    };
+    syncActivePeriod();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -93,9 +119,9 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
     if (!confirm("Batalkan pin ini?")) return;
     try {
       setIsCancelling(pinId);
-      await PinService.cancelPin(pinId, user.id);
+      const updated = await PinService.cancelPin(pinId, user.id);
       await loadPinHistory();
-      onAfterCancel && onAfterCancel();
+      onAfterCancel && onAfterCancel((updated as any)?.pins_remaining);
     } catch (e: any) {
       console.error(e);
       alert(e.message || "Gagal membatalkan pin");
@@ -314,7 +340,11 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
 
                   {/* Actions */}
                   <div className="flex items-center space-x-2">
-                    {canCancelPin((pin as any).month || new Date(pin.created_at).getMonth() + 1, pin.year) ? (
+                    {canCancelPin(
+                      (pin as any).month ||
+                        new Date(pin.created_at).getMonth() + 1,
+                      pin.year
+                    ) ? (
                       <button
                         onClick={() => handleCancel(pin.id)}
                         disabled={isCancelling === pin.id}
@@ -340,9 +370,11 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
           {totalPages > 1 && (
             <div className="mt-8 flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Menampilkan {startIndex + 1}-{Math.min(endIndex, pinHistory.length)} dari {pinHistory.length} riwayat
+                Menampilkan {startIndex + 1}-
+                {Math.min(endIndex, pinHistory.length)} dari {pinHistory.length}{" "}
+                riwayat
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 {/* Previous Button */}
                 <button
@@ -356,19 +388,21 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
 
                 {/* Page Numbers */}
                 <div className="flex items-center space-x-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => goToPage(page)}
-                      className={`px-3 py-2 text-sm rounded-lg transition-colors ${
-                        currentPage === page
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        onClick={() => goToPage(page)}
+                        className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                          currentPage === page
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
                 </div>
 
                 {/* Next Button */}

@@ -24,17 +24,12 @@ export interface DashboardStats {
 export class DashboardService {
   static async getDashboardStats(userId: string): Promise<DashboardStats> {
     try {
-      // Get current active period
-      const { data: currentPeriod, error: periodError } = await supabase
+      // Get current active period (optional for dashboard; we can still show employees without it)
+      const { data: currentPeriod } = await supabase
         .from('assessment_periods')
         .select('*')
         .eq('is_active', true)
         .maybeSingle()
-
-      if (periodError || !currentPeriod) {
-        // Don't log error, just return default stats gracefully
-        return this.getDefaultStats()
-      }
 
       // Check if user is supervisor or admin
       const { adminIds, supervisorIds } = await RolesService.getRoleUserIds()
@@ -59,6 +54,22 @@ export class DashboardService {
       const totalEmployees = profiles?.filter(profile => 
         !adminIds.includes(profile.id)
       ).length || 0
+
+      // If no active assessment period, skip period-bound queries but still return counts
+      if (!currentPeriod) {
+        return {
+          totalEmployees,
+          completedAssessments: 0,
+          pendingAssessments: isSupervisor ? totalEmployees : maxAssignments,
+          currentPeriod: 'Tidak ada periode aktif',
+          myProgress: 0,
+          averageRating: 0,
+          myAssignments: [],
+          currentPeriodData: null,
+          isSupervisor,
+          maxAssignments
+        }
+      }
 
       // Get my assignments for current period
       const { data: myAssignments, error: assignmentsError } = await supabase

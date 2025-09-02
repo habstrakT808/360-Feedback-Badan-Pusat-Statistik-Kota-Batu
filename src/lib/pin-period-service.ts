@@ -58,6 +58,21 @@ export class PinPeriodService {
     if (error) throw error
   }
 
+  // Reset all pins (by date range) and reset monthly allowance values for the period (to 4/0)
+  static async reset(id: string): Promise<{ pins_deleted: number; allowances_reset: number }> {
+    // Delegate to server route to use service role (bypass RLS)
+    const res = await fetch('/api/admin/reset-pin-period', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(text || 'Gagal mereset periode')
+    }
+    return res.json()
+  }
+
   static async getActive(): Promise<PinPeriod | null> {
     const { data, error } = await supabase
       .from('pin_periods')

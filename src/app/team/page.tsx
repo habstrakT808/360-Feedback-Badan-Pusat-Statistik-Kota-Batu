@@ -542,12 +542,7 @@ export default function TeamPage() {
   const { user } = useStore();
   const { isSupervisor, isLoading, isAdmin } = useUserRole();
   const router = useRouter();
-
-  useEffect(() => {
-    if (isAdmin) {
-      router.replace("/admin");
-    }
-  }, [isAdmin, router]);
+  const canSupervisorView = isSupervisor || isAdmin;
 
   if (isLoading || !user) {
     return (
@@ -561,7 +556,7 @@ export default function TeamPage() {
 
   return (
     <DashboardLayout>
-      {isSupervisor ? <SupervisorTeamView /> : <RegularTeamView />}
+      {canSupervisorView ? <SupervisorTeamView /> : <RegularTeamView />}
     </DashboardLayout>
   );
 }

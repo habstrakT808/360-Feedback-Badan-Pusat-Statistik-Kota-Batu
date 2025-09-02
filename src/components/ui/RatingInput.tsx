@@ -107,7 +107,7 @@ export function RatingInput({
       return;
     }
 
-    // Apply min/max constraints
+    // Apply min/max constraints (clamp)
     let constrainedValue = numValue;
     if (numValue < minValue) {
       constrainedValue = minValue;

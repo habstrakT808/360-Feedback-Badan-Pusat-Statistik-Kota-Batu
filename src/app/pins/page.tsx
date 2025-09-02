@@ -40,11 +40,11 @@ export default function PinsPage() {
   const currentWeek = PinService.getCurrentWeekNumber();
   const currentYear = PinService.getCurrentYear();
   const currentMonth = PinService.getCurrentMonth();
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activePinPeriod, setActivePinPeriod] = useState<any | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(currentMonth);
-  const [selectedYear, setSelectedYear] = useState<number | null>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
@@ -58,6 +58,15 @@ export default function PinsPage() {
     }
   }, [user?.id, selectedMonth, selectedYear]);
 
+  // Sinkronkan pilihan bulan/tahun awal dengan periode aktif saat tersedia
+  useEffect(() => {
+    if (activePinPeriod && (selectedMonth === null || selectedYear === null)) {
+      setSelectedMonth(activePinPeriod.month ?? currentMonth);
+      setSelectedYear(activePinPeriod.year ?? currentYear);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePinPeriod]);
+
   const loadData = async () => {
     try {
       setIsLoading(true);
@@ -65,14 +74,20 @@ export default function PinsPage() {
       // Hapus pemanggilan createTestPins yang sudah dinonaktifkan
       // await PinService.createTestPins(user!.id);
 
-      const [monthly, allowance, members, pinPeriod] = await Promise.all([
-        PinService.getMonthlyRanking(
-          selectedMonth || undefined,
-          selectedYear || undefined
-        ),
+      const [pinPeriod] = await Promise.all([PinPeriodService.getActive()]);
+
+      // Tentukan bulan/tahun target dari pilihan atau periode aktif
+      const targetMonth = (selectedMonth ||
+        pinPeriod?.month ||
+        currentMonth) as number;
+      const targetYear = (selectedYear ||
+        pinPeriod?.year ||
+        currentYear) as number;
+
+      const [monthly, allowance, members] = await Promise.all([
+        PinService.getMonthlyRanking(targetMonth, targetYear),
         PinService.getMonthlyPinAllowance(user!.id),
         PinService.getAvailableTeamMembers(user!.id),
-        PinPeriodService.getActive(),
       ]);
 
       // Debug: Log semua user ID untuk mengidentifikasi duplikat
@@ -91,6 +106,11 @@ export default function PinsPage() {
       setTeamMembers(members);
       setPinsRemaining(allowance?.pins_remaining || 0);
       setActivePinPeriod(pinPeriod);
+      // Sinkronkan filter UI ke periode aktif bila belum dipilih
+      if (pinPeriod && (selectedMonth === null || selectedYear === null)) {
+        setSelectedMonth(pinPeriod.month ?? currentMonth);
+        setSelectedYear(pinPeriod.year ?? currentYear);
+      }
     } catch (error: any) {
       console.error("Error loading pin data:", error);
       toast.error("Gagal memuat data pin: " + error.message);
@@ -211,10 +231,11 @@ export default function PinsPage() {
                 <h3 className="text-lg font-semibold">Periode Saat Ini</h3>
               </div>
               <div className="text-lg font-semibold mb-2">
-                Minggu {currentWeek}, {currentYear}
+                Minggu {currentWeek}, {activePinPeriod?.year || currentYear}
               </div>
               <p className="text-green-100 text-sm">
-                {getMonthName(currentMonth)} {currentYear}
+                {getMonthName(activePinPeriod?.month || currentMonth)}{" "}
+                {activePinPeriod?.year || currentYear}
               </p>
             </div>
 
@@ -374,14 +395,25 @@ export default function PinsPage() {
                       Employee of the Month
                     </h2>
                     <p className="text-gray-600">
-                      Nominasi {getMonthName(selectedMonth || currentMonth)}{" "}
-                      {selectedYear || currentYear}
+                      Nominasi{" "}
+                      {getMonthName(
+                        (selectedMonth ??
+                          activePinPeriod?.month ??
+                          currentMonth) as number
+                      )}{" "}
+                      {
+                        (selectedYear ??
+                          activePinPeriod?.year ??
+                          currentYear) as number
+                      }
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <select
-                    value={selectedMonth || ""}
+                    value={
+                      (selectedMonth ?? activePinPeriod?.month ?? "") as any
+                    }
                     onChange={(e) =>
                       setSelectedMonth(
                         e.target.value ? Number(e.target.value) : null
@@ -397,7 +429,7 @@ export default function PinsPage() {
                     ))}
                   </select>
                   <select
-                    value={selectedYear || ""}
+                    value={(selectedYear ?? activePinPeriod?.year ?? "") as any}
                     onChange={(e) =>
                       setSelectedYear(
                         e.target.value ? Number(e.target.value) : null
@@ -436,8 +468,16 @@ export default function PinsPage() {
                     Tidak ada riwayat pada bulan ini
                   </h3>
                   <p className="text-gray-400">
-                    {getMonthName(selectedMonth || currentMonth)}{" "}
-                    {selectedYear || currentYear}
+                    {getMonthName(
+                      (selectedMonth ??
+                        activePinPeriod?.month ??
+                        currentMonth) as number
+                    )}{" "}
+                    {
+                      (selectedYear ??
+                        activePinPeriod?.year ??
+                        currentYear) as number
+                    }
                   </p>
                 </div>
               ) : (
@@ -573,6 +613,46 @@ export default function PinsPage() {
                             </div>
                           ))}
                         </div>
+
+                        {/* Full ranking list below */}
+                        <div className="mt-8 bg-white rounded-2xl border border-gray-100">
+                          <div className="p-4 font-semibold text-gray-800">
+                            Daftar Peringkat Lengkap
+                          </div>
+                          <div className="divide-y">
+                            {monthlyRanking.map((u, idx) => (
+                              <div
+                                key={`full-${u.user_id}`}
+                                className="flex items-center justify-between p-4"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 text-gray-700 text-sm font-bold">
+                                    #{idx + 1}
+                                  </div>
+                                  <img
+                                    src={u.avatar_url || "/logo-bps.png"}
+                                    alt={u.full_name}
+                                    className="w-10 h-10 rounded-full object-cover"
+                                  />
+                                  <div>
+                                    <div className="font-medium text-gray-900">
+                                      {u.full_name}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {u.pin_count} pin
+                                    </div>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleCardClick(u)}
+                                  className="text-sm px-3 py-1 rounded-lg border hover:bg-gray-50"
+                                >
+                                  Detail
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </>
                     );
                   })()}
@@ -584,7 +664,14 @@ export default function PinsPage() {
           {/* Pin History */}
           {activeTab === "history" && (
             <div>
-              <PinHistory onAfterCancel={loadData} />
+              <PinHistory
+                onAfterCancel={async (newPinsRemaining) => {
+                  if (typeof newPinsRemaining === "number") {
+                    setPinsRemaining(newPinsRemaining);
+                  }
+                  await loadData();
+                }}
+              />
             </div>
           )}
         </motion.div>
@@ -598,8 +685,12 @@ export default function PinsPage() {
           user={selectedUser}
           periodType="monthly"
           periodInfo={{
-            month: selectedMonth || currentMonth,
-            year: selectedYear || currentYear,
+            month: (selectedMonth ??
+              activePinPeriod?.month ??
+              currentMonth) as number,
+            year: (selectedYear ??
+              activePinPeriod?.year ??
+              currentYear) as number,
           }}
         />
       )}

@@ -33,7 +33,6 @@ const navigation = [
     ],
   },
   { name: "Hasil Saya", href: "/my-results", icon: Award },
-  { name: "Tim", href: "/team", icon: Users },
 ];
 
 // Admin-only navigation items
@@ -107,25 +106,53 @@ export function Navigation() {
     return pathname === href;
   };
 
-  // Open the Beri Penilaian section when on its children routes
+  // Open the Beri Penilaian / Hasil section when on its children routes
   useEffect(() => {
     const isAssessment = pathname?.startsWith("/assessment");
     const isPins = pathname?.startsWith("/pins");
     const isTriwulan = pathname?.startsWith("/triwulan");
+    const isResultsPins = pathname?.startsWith("/results/pins");
+    const isTeam = pathname?.startsWith("/team");
     if (isAssessment || isPins || isTriwulan) {
       setOpenMenu("Beri Penilaian");
+    }
+    if (isResultsPins || isTeam || pathname?.startsWith("/triwulan/winner")) {
+      setOpenMenu("Hasil");
     }
   }, [pathname]);
 
   // Combine navigation based on user role
-  const allNavigation = isAdmin ? adminNavigation : navigation;
-  
+  const baseNav = navigation.slice();
+
+  // Inject "Hasil" dropdown for supervisor/admin only
+  const hasilDropdown = {
+    name: "Hasil",
+    icon: Award,
+    children: [
+      { name: "Hasil 360", href: "/team", icon: Users },
+      { name: "EOTM - Peringkat Bulanan", href: "/results/pins", icon: Pin },
+      { name: "Triwulan - Pemenang", href: "/triwulan/winner", icon: Award },
+    ],
+  } as any;
+
+  let roleNav = baseNav;
+  if (isSupervisor || isAdmin) {
+    // place after "Beri Penilaian"
+    const insertIndex = 2; // after first two items (Dashboard, Beri Penilaian)
+    roleNav = baseNav
+      .slice(0, insertIndex)
+      .concat([hasilDropdown], baseNav.slice(insertIndex));
+  }
+
   // Filter navigation for supervisors (hide "Hasil Saya")
-  const filteredNavigation = isSupervisor 
-    ? navigation.filter(item => item.name !== "Hasil Saya")
-    : navigation;
-    
-  const finalNavigation = isAdmin ? adminNavigation : filteredNavigation;
+  const filteredNavigation = isSupervisor
+    ? roleNav.filter((item) => item.name !== "Hasil Saya")
+    : roleNav;
+
+  // Admin: show Admin at the very top, followed by Hasil dropdown only
+  const finalNavigation = isAdmin
+    ? (adminNavigation as any).concat([hasilDropdown] as any)
+    : filteredNavigation;
 
   return (
     <>
@@ -242,7 +269,7 @@ export function Navigation() {
 
           {/* Navigation */}
           <nav className="flex-1 px-6 pb-6 space-y-2 overflow-y-auto custom-scrollbar">
-            {finalNavigation.map((item, index) => {
+            {finalNavigation.map((item: any, index: number) => {
               const hasChildren = Array.isArray((item as any).children);
               if (hasChildren) {
                 const children = (item as any).children as Array<{

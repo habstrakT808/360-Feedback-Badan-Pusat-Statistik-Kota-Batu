@@ -94,9 +94,21 @@ export function AdminExportModal({ isOpen, onClose }: AdminExportModalProps) {
     }
   }, [isOpen, hasPermission]);
 
+  // Refetch periods when data type switches (pins vs assessments)
+  useEffect(() => {
+    if (!isOpen || !hasPermission) return;
+    // reset selectedPeriod when switching type to avoid mismatched IDs
+    setExportOptions((prev) => ({ ...prev, selectedPeriod: "" }));
+    fetchPeriods();
+  }, [exportOptions.dataType, isOpen, hasPermission]);
+
   const fetchPeriods = async () => {
     try {
-      const response = await fetch("/api/admin/periods", {
+      const endpoint =
+        exportOptions.dataType === "pins"
+          ? "/api/admin/pin-periods"
+          : "/api/admin/periods";
+      const response = await fetch(endpoint, {
         headers: {
           Authorization: `Bearer ${
             (

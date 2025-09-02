@@ -31,7 +31,7 @@ const assessmentSchema = z.object({
       combinedIndicator: z.string(),
       rating: z
         .number()
-        .min(71, "Rating minimal 71")
+        .min(80, "Rating minimal 80")
         .max(90, "Rating maksimal 90"),
       comment: z.string().optional(),
     })
@@ -82,10 +82,10 @@ export function AssessmentForm({
   const currentResponse = responses[currentStep];
   const isStepComplete =
     typeof currentResponse?.rating === "number" &&
-    currentResponse.rating >= 71 &&
+    currentResponse.rating >= 80 &&
     currentResponse.rating <= 90;
   const totalComplete = responses.filter(
-    (r) => typeof r.rating === "number" && r.rating >= 71 && r.rating <= 90
+    (r) => typeof r.rating === "number" && r.rating >= 80 && r.rating <= 90
   ).length;
   const totalQuestions = responses.length;
 
@@ -267,7 +267,7 @@ export function AssessmentForm({
                         value={field.value}
                         onChange={field.onChange}
                         max={10}
-                        minValue={71}
+                        minValue={80}
                         maxValue={90}
                         size="lg"
                       />
@@ -281,10 +281,10 @@ export function AssessmentForm({
                       <span className="text-green-600 font-medium">
                         Rating: {currentResponse.rating}/90
                       </span>
-                    ) : currentResponse.rating < 71 ||
+                    ) : currentResponse.rating < 80 ||
                       currentResponse.rating > 90 ? (
                       <span className="text-red-600 font-medium">
-                        Hanya bisa memasukkan angka dari 71-90
+                        Hanya bisa memasukkan angka dari 80-90
                       </span>
                     ) : null}
                   </div>

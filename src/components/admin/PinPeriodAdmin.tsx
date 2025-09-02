@@ -2,7 +2,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Plus, Edit, Trash2 } from "lucide-react";
+import { Calendar, Plus, Edit, Trash2, RotateCcw } from "lucide-react";
 import { PinPeriodService } from "@/lib/pin-period-service";
 import { toast } from "react-hot-toast";
 
@@ -103,6 +103,24 @@ export function PinPeriodAdmin() {
     }
   };
 
+  const reset = async (id: string) => {
+    if (
+      !confirm(
+        "Reset periode ini? Semua pin pada rentang tanggal periode akan dihapus dan jatah pin bulan tersebut direset."
+      )
+    )
+      return;
+    try {
+      const res = await PinPeriodService.reset(id);
+      toast.success(
+        `Periode direset. Pin dihapus: ${res.pins_deleted}, allowance direset: ${res.allowances_reset}`
+      );
+      await load();
+    } catch (e: any) {
+      toast.error(e.message || "Gagal mereset periode");
+    }
+  };
+
   // Removed seeding helpers per request
 
   return (
@@ -183,6 +201,13 @@ export function PinPeriodAdmin() {
                     className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
                   >
                     <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => reset(p.id)}
+                    className="p-2 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg"
+                    title="Reset periode (hapus pin & reset jatah)"
+                  >
+                    <RotateCcw className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => remove(p.id)}

@@ -68,7 +68,9 @@ export class AdminExportService {
 
 
 
-  private static exportToExcel(data: any[], options: ExportOptions, filename: string) {
+  private static exportToExcel(data: any, options: ExportOptions, filename: string) {
+    console.log('Export to Excel - dataType:', options.dataType, 'data:', data);
+    
     const workbook = XLSX.utils.book_new();
 
     // SIMPLIFIED: Only create the main results sheet as requested by client
@@ -79,6 +81,15 @@ export class AdminExportService {
       this.addPinSheets(workbook, data);
     } else if (options.dataType === 'triwulan') {
       this.addTriwulanSheets(workbook, data);
+    }
+
+    // Check if workbook has any sheets
+    const sheetNames = workbook.SheetNames;
+    console.log('Workbook sheet names:', sheetNames);
+    
+    if (sheetNames.length === 0) {
+      console.error('Workbook is empty - no sheets created');
+      throw new Error('Tidak ada data yang dapat diekspor');
     }
 
     // Export file
@@ -234,39 +245,105 @@ export class AdminExportService {
   }
 
   private static addPinSheets(workbook: XLSX.WorkBook, data: any[]) {
-    // Pin Statistics by Week
-    const weekStats = this.calculateWeekStats(data);
-    const weekSheet = XLSX.utils.aoa_to_sheet([
-      ['Week', 'Year', 'Month', 'Total Pins', 'Unique Givers', 'Unique Receivers'],
-      ...weekStats
-    ]);
-    XLSX.utils.book_append_sheet(workbook, weekSheet, 'Weekly Stats');
+    // Sheet 1: Pins by Giver (siapa memberi kepada siapa dan berapa banyak)
+    const giverRows = this.calculatePinsByGiver(data);
+    const giverHeader = ['Giver Name', 'Giver Email', 'Receiver Name', 'Receiver Email', 'Pins Given'];
+    const giverSheet = XLSX.utils.aoa_to_sheet([giverHeader, ...giverRows]);
+    this.styleSheet(giverSheet, giverHeader.length, giverRows);
+    XLSX.utils.book_append_sheet(workbook, giverSheet, 'Pins by Giver');
 
-    // Top Receivers
+    // Sheet 2: Ranking penerima (siapa menerima pin terbanyak)
     const topReceivers = this.calculateTopReceivers(data);
-    const receiversSheet = XLSX.utils.aoa_to_sheet([
-      ['Receiver Name', 'Receiver Email', 'Total Pins Received', 'Department'],
-      ...topReceivers
-    ]);
+    const recvHeader = ['Receiver Name', 'Receiver Email', 'Total Pins Received', 'Department'];
+    const receiversSheet = XLSX.utils.aoa_to_sheet([recvHeader, ...topReceivers]);
+    this.styleSheet(receiversSheet, recvHeader.length, topReceivers);
     XLSX.utils.book_append_sheet(workbook, receiversSheet, 'Top Receivers');
   }
 
-  private static addTriwulanSheets(workbook: XLSX.WorkBook, data: any[]) {
-    // Winners by Period
-    const periodWinners = data.map(winner => [
-      winner.period_month,
-      winner.period_year,
-      winner.winner_name,
-      winner.winner_email,
-      winner.total_score,
-      winner.decided_at
-    ]);
+  private static addTriwulanSheets(workbook: XLSX.WorkBook, data: any) {
+    // Extract ranking data and detailed ratings
+    const rankingData = Array.isArray(data) ? data : (data.ranking || []);
+    const detailedRatings = data.detailedRatings || [];
 
-    const winnersSheet = XLSX.utils.aoa_to_sheet([
-      ['Month', 'Year', 'Winner Name', 'Winner Email', 'Score', 'Decided At'],
-      ...periodWinners
-    ]);
-    XLSX.utils.book_append_sheet(workbook, winnersSheet, 'Winners by Period');
+    console.log('Triwulan data:', { rankingData: rankingData.length, detailedRatings: detailedRatings.length });
+
+    // Sheet 1: Detail Per Aspek (Setiap baris = 1 penilai, 1 kandidat, 1 aspek)
+    if (detailedRatings.length > 0) {
+      const aspectDetailRows: any[][] = [];
+      
+      detailedRatings.forEach((rating: any) => {
+        const aspects = [
+          { name: 'Aspek 1', value: rating.c1 },
+          { name: 'Aspek 2', value: rating.c2 },
+          { name: 'Aspek 3', value: rating.c3 },
+          { name: 'Aspek 4', value: rating.c4 },
+          { name: 'Aspek 5', value: rating.c5 },
+          { name: 'Aspek 6', value: rating.c6 },
+          { name: 'Aspek 7', value: rating.c7 },
+          { name: 'Aspek 8', value: rating.c8 },
+          { name: 'Aspek 9', value: rating.c9 },
+          { name: 'Aspek 10', value: rating.c10 },
+          { name: 'Aspek 11', value: rating.c11 },
+          { name: 'Aspek 12', value: rating.c12 },
+          { name: 'Aspek 13', value: rating.c13 }
+        ];
+        
+        aspects.forEach(aspect => {
+          aspectDetailRows.push([
+            rating.rater_name,
+            rating.rater_email,
+            rating.candidate_name,
+            rating.candidate_email,
+            aspect.name,
+            aspect.value
+          ]);
+        });
+      });
+      
+      const aspectDetailHeader = ['Penilai', 'Email Penilai', 'Kandidat', 'Email Kandidat', 'Aspek', 'Nilai'];
+      const aspectDetailSheet = XLSX.utils.aoa_to_sheet([aspectDetailHeader, ...aspectDetailRows]);
+      this.styleSheet(aspectDetailSheet, aspectDetailHeader.length, aspectDetailRows);
+      XLSX.utils.book_append_sheet(workbook, aspectDetailSheet, 'Detail Per Aspek');
+    }
+
+    // Sheet 2: Summary Penilaian (Format lama untuk referensi)
+    if (detailedRatings.length > 0) {
+      const detHeader = [
+        'Penilai', 'Email Penilai', 'Kandidat', 'Email Kandidat',
+        'Aspek 1', 'Aspek 2', 'Aspek 3', 'Aspek 4', 'Aspek 5', 'Aspek 6', 'Aspek 7', 'Aspek 8', 
+        'Aspek 9', 'Aspek 10', 'Aspek 11', 'Aspek 12', 'Aspek 13'
+      ];
+      const detRows = detailedRatings.map((r: any) => [
+        r.rater_name, r.rater_email, r.candidate_name, r.candidate_email, 
+        r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13
+      ]);
+      const detSheet = XLSX.utils.aoa_to_sheet([detHeader, ...detRows]);
+      this.styleSheet(detSheet, detHeader.length, detRows);
+      XLSX.utils.book_append_sheet(workbook, detSheet, 'Summary Penilaian');
+    }
+
+    // Sheet 3: Ranking dan Skor Akhir
+    if (rankingData.length > 0) {
+      const header = ['Peringkat', 'Nama', 'Email', 'Skor Akhir'];
+      const rows = rankingData.map((r: any, index: number) => [
+        index + 1, // Peringkat
+        r.name, 
+        r.email, 
+        r.score
+      ]);
+      const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
+      this.styleSheet(sheet, header.length, rows);
+      XLSX.utils.book_append_sheet(workbook, sheet, 'Perangkingan');
+    }
+
+    // Fallback: Jika tidak ada data sama sekali, buat sheet kosong dengan pesan
+    if (detailedRatings.length === 0 && rankingData.length === 0) {
+      const fallbackHeader = ['Status'];
+      const fallbackRows = [['Tidak ada data triwulan tersedia']];
+      const fallbackSheet = XLSX.utils.aoa_to_sheet([fallbackHeader, ...fallbackRows]);
+      this.styleSheet(fallbackSheet, fallbackHeader.length, fallbackRows);
+      XLSX.utils.book_append_sheet(workbook, fallbackSheet, 'Data Kosong');
+    }
   }
 
 
@@ -310,9 +387,9 @@ export class AdminExportService {
       const receiverId = item.receiver_id;
       if (!receiverMap.has(receiverId)) {
         receiverMap.set(receiverId, {
-          name: item.receiver_name,
-          email: item.receiver_email,
-          department: item.receiver_department,
+          name: item.receiver_name || item.receiver_full_name || item.receiver?.full_name || '',
+          email: item.receiver_email || item.receiver?.email || '',
+          department: item.receiver_department || item.receiver?.department || '',
           count: 0
         });
       }
@@ -327,6 +404,100 @@ export class AdminExportService {
         receiver.count,
         receiver.department
       ]);
+  }
+
+  private static calculatePinsByGiver(data: any[]) {
+    // Aggregate per giver->receiver pair
+    const pairMap = new Map<string, { giverName: string; giverEmail: string; receiverName: string; receiverEmail: string; count: number }>();
+    data.forEach(item => {
+      const giverId = item.giver_id;
+      const receiverId = item.receiver_id;
+      const key = `${giverId}__${receiverId}`;
+      const giverName = item.giver_name || item.giver_full_name || item.giver?.full_name || '';
+      const giverEmail = item.giver_email || item.giver?.email || '';
+      const receiverName = item.receiver_name || item.receiver_full_name || item.receiver?.full_name || '';
+      const receiverEmail = item.receiver_email || item.receiver?.email || '';
+      if (!pairMap.has(key)) {
+        pairMap.set(key, { giverName, giverEmail, receiverName, receiverEmail, count: 0 });
+      }
+      pairMap.get(key)!.count++;
+    });
+    // Sort by giver name then count desc
+    return Array.from(pairMap.values())
+      .sort((a, b) => a.giverName.localeCompare(b.giverName) || b.count - a.count)
+      .map(r => [r.giverName, r.giverEmail, r.receiverName, r.receiverEmail, r.count]);
+  }
+
+  private static styleSheet(sheet: XLSX.WorkSheet, numCols: number, rows: any[][]) {
+    // Set header style
+    const headerStyle: any = {
+      font: { bold: true, color: { rgb: 'FFFFFF' }, size: 12 },
+      fill: { fgColor: { rgb: '2563EB' } }, // blue
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: {
+        top: { style: 'thin', color: { rgb: '000000' } },
+        bottom: { style: 'thin', color: { rgb: '000000' } },
+        left: { style: 'thin', color: { rgb: '000000' } },
+        right: { style: 'thin', color: { rgb: '000000' } },
+      },
+    };
+    
+    // Apply header style
+    for (let c = 0; c < numCols; c++) {
+      const cell = XLSX.utils.encode_cell({ r: 0, c });
+      if (!sheet[cell]) sheet[cell] = {} as any;
+      (sheet as any)[cell].s = headerStyle;
+    }
+
+    // Data style
+    const dataStyle: any = {
+      font: { size: 11 },
+      alignment: { horizontal: 'left', vertical: 'center', wrapText: true },
+      border: {
+        top: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      },
+    };
+    
+    // Apply data style
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    for (let r = 1; r <= range.e.r; r++) {
+      for (let c = 0; c <= range.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!sheet[addr]) sheet[addr] = {} as any;
+        (sheet as any)[addr].s = dataStyle;
+      }
+    }
+
+    // Auto width by content length with better calculation
+    const matrix = [[...Array(numCols).keys()].map(() => '')].concat(rows as any);
+    const widths = Array.from({ length: numCols }).map((_, c) => {
+      const maxLen = Math.max(
+        ...matrix.map(row => {
+          const v = row[c];
+          const s = v == null ? '' : String(v);
+          // Calculate width based on character count and type
+          let width = s.length;
+          // Add extra width for numbers and emails
+          if (typeof v === 'number' || /^\d+$/.test(s)) width += 2;
+          if (/@/.test(s)) width += 5;
+          // Add extra width for aspect names
+          if (s.includes('Aspek')) width += 3;
+          return width;
+        })
+      );
+      // Set minimum and maximum width with better defaults
+      return { wch: Math.min(Math.max(maxLen + 4, 12), 80) };
+    });
+    (sheet as any)['!cols'] = widths;
+    
+    // Set row height for better readability
+    const rowHeights = Array.from({ length: range.e.r + 1 }, (_, r) => {
+      return r === 0 ? 25 : 20; // Header row taller
+    });
+    (sheet as any)['!rows'] = rowHeights;
   }
 
   private static getDataTypeName(dataType: string) {

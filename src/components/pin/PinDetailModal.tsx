@@ -56,11 +56,54 @@ export function PinDetailModal({
         periodInfo,
       });
 
-      // Query untuk mendapatkan pin berdasarkan receiver_id
-      const { data: pins, error: pinsError } = await supabase
-        .from("employee_pins")
-        .select("giver_id, receiver_id, week_number, year, month, created_at")
-        .eq("receiver_id", user.user_id);
+      // Ambil periode bulan/tahun untuk menentukan rentang tanggal
+      const month = periodInfo.month;
+      const year = periodInfo.year;
+
+      // Cari rentang tanggal dari pin_periods; jika tidak ada, fallback ke filter month/year langsung
+      const { data: periodForMonth } = await (supabase as any)
+        .from("pin_periods")
+        .select("start_date, end_date")
+        .eq("month", month || 1)
+        .eq("year", year)
+        .single();
+
+      let pins: any[] | null = null;
+      let pinsError: any = null;
+
+      if (
+        periodForMonth &&
+        periodForMonth.start_date &&
+        periodForMonth.end_date
+      ) {
+        // Filter menggunakan rentang tanggal periode untuk menangkap pin yang masih dihitung ke periode ini
+        const { data, error } = await supabase
+          .from("employee_pins")
+          .select(
+            `giver_id, receiver_id, week_number, year, month, created_at,
+             giver:profiles!employee_pins_giver_id_fkey(id, full_name, avatar_url)`
+          )
+          .eq("receiver_id", user.user_id)
+          .gte("created_at", periodForMonth.start_date)
+          .lte("created_at", periodForMonth.end_date)
+          .order("created_at", { ascending: false });
+        pins = data as any[];
+        pinsError = error;
+      } else {
+        // Fallback: gunakan filter month/year langsung
+        const { data, error } = await supabase
+          .from("employee_pins")
+          .select(
+            `giver_id, receiver_id, week_number, year, month, created_at,
+             giver:profiles!employee_pins_giver_id_fkey(id, full_name, avatar_url)`
+          )
+          .eq("receiver_id", user.user_id)
+          .eq("month", month || 1)
+          .eq("year", year)
+          .order("created_at", { ascending: false });
+        pins = data as any[];
+        pinsError = error;
+      }
 
       console.log("🔍 All pins for receiver:", { pins, pinsError });
 
@@ -75,44 +118,13 @@ export function PinDetailModal({
         return;
       }
 
-      // Filter berdasarkan periode bulanan saja
-      const filteredPins = pins.filter(
-        (pin) => pin.month === periodInfo.month && pin.year === periodInfo.year
-      );
-      console.log("🔍 Filtered monthly pins:", filteredPins);
-
-      console.log("🔍 Final filtered pins:", filteredPins);
-
-      if (filteredPins.length === 0) {
-        console.log("🔍 No pins found for the specified period");
-        setPinGivers([]);
-        return;
-      }
-
-      // Ambil data giver untuk setiap pin
-      const givers = [];
-      for (const pin of filteredPins) {
-        const { data: giverProfile, error: giverError } = await supabase
-          .from("profiles")
-          .select("id, full_name, avatar_url")
-          .eq("id", pin.giver_id)
-          .single();
-
-        if (giverError) {
-          console.error(
-            `Error fetching giver profile for ${pin.giver_id}:`,
-            giverError
-          );
-          continue;
-        }
-
-        givers.push({
-          giver_id: pin.giver_id,
-          giver_name: giverProfile?.full_name || "Unknown",
-          giver_avatar: giverProfile?.avatar_url,
-          created_at: pin.created_at,
-        });
-      }
+      // Mapping langsung menggunakan join profile yang sudah diambil
+      const givers = (pins as any[]).map((pin) => ({
+        giver_id: pin.giver_id,
+        giver_name: pin.giver?.full_name || "Unknown",
+        giver_avatar: pin.giver?.avatar_url || null,
+        created_at: pin.created_at,
+      }));
 
       // Debug: log processed givers
       console.log("🔍 Processed givers:", givers);

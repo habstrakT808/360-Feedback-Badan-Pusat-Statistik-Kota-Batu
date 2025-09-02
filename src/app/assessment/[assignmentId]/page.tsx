@@ -126,7 +126,7 @@ export default function RegularAssessmentPage() {
       (aspect) =>
         !responses[aspect.id] ||
         !responses[aspect.id].rating ||
-        responses[aspect.id].rating < 71 ||
+        responses[aspect.id].rating < 80 ||
         responses[aspect.id].rating > 90
     );
 
@@ -135,7 +135,7 @@ export default function RegularAssessmentPage() {
 
   const handleSubmit = async () => {
     if (!validateResponses()) {
-      toast.error("Mohon lengkapi semua penilaian dengan rating 71-90");
+      toast.error("Mohon lengkapi semua penilaian dengan rating 80-90");
       return;
     }
 
@@ -291,7 +291,7 @@ export default function RegularAssessmentPage() {
               </span>
             </div>
             <p className="text-blue-700 text-sm mt-1">
-              Skala penilaian: 71-90 per aspek (Bobot rekan kerja: 40%)
+              Skala penilaian: 80-90 per aspek (Bobot rekan kerja: 40%)
             </p>
           </div>
         </motion.div>
@@ -349,14 +349,14 @@ export default function RegularAssessmentPage() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Rating Aspek {aspect.name} (71-90)
+                      Rating Aspek {aspect.name} (80-90)
                     </label>
                     <RatingInput
                       value={response.rating}
                       onChange={(rating) =>
                         handleRatingChange(aspect.id, rating)
                       }
-                      minValue={71}
+                      minValue={80}
                       maxValue={90}
                       max={90}
                       showNumber={true}
