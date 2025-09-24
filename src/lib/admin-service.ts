@@ -239,7 +239,18 @@ export class AdminService {
 
   static async updatePeriod(_periodId: string, _updates: Partial<AssessmentPeriod>) {
     try {
-      throw new Error('Update period is server-only. Please use admin API route.')
+      // Delegate ke API admin agar Prisma tetap di server
+      const response = await fetch('/api/admin/periods', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: _periodId, updates: _updates }),
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to update period')
+      }
+      const json = await response.json().catch(() => ({}))
+      return json.period || { id: _periodId, ..._updates }
     } catch (error) {
       console.error('Error updating period:', error)
       throw error
@@ -248,7 +259,18 @@ export class AdminService {
 
   static async deletePeriod(_periodId: string) {
     try {
-      throw new Error('Delete period is server-only. Please use admin API route.')
+      // Panggil API admin untuk hapus periode agar berjalan di server
+      const response = await fetch('/api/admin/periods', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: _periodId }),
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to delete period')
+      }
+      const json = await response.json().catch(() => ({}))
+      return json.success ? { success: true } : { success: false }
     } catch (error) {
       console.error('Error deleting period:', error)
       throw error

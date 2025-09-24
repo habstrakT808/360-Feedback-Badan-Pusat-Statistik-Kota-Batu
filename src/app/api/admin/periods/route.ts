@@ -90,3 +90,71 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Resolve role using profile.id from email
+    const prof = await prisma.profile.findUnique({ where: { email: session.user.email as string } })
+    const isAdminOrSupervisor = prof
+      ? await prisma.userRole.findFirst({ where: { user_id: prof.id, role: { in: ['admin', 'supervisor'] } } })
+      : null
+    if (!isAdminOrSupervisor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const body = await request.json().catch(() => ({}))
+    const { id } = body || {}
+    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+
+    // Hapus data terkait dalam transaksi berurutan agar tidak melanggar FK
+    await prisma.$transaction(async (tx) => {
+      const assignments = await tx.assessmentAssignment.findMany({
+        where: { period_id: id },
+        select: { id: true },
+      })
+      const assignmentIds = assignments.map(a => a.id)
+      if (assignmentIds.length > 0) {
+        await tx.feedbackResponse.deleteMany({ where: { assignment_id: { in: assignmentIds } } })
+      }
+      await tx.assessmentAssignment.deleteMany({ where: { period_id: id } })
+      await tx.assessmentPeriod.delete({ where: { id } })
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('API error (DELETE /admin/periods):', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const prof = await prisma.profile.findUnique({ where: { email: session.user.email as string } })
+    const isAdminOrSupervisor = prof
+      ? await prisma.userRole.findFirst({ where: { user_id: prof.id, role: { in: ['admin', 'supervisor'] } } })
+      : null
+    if (!isAdminOrSupervisor) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    const body = await request.json().catch(() => ({}))
+    const { id, updates } = body || {}
+    if (!id || !updates) return NextResponse.json({ error: 'id and updates are required' }, { status: 400 })
+
+    const data: any = {}
+    if (updates.month !== undefined) data.month = updates.month
+    if (updates.year !== undefined) data.year = updates.year
+    if (updates.start_date) data.start_date = new Date(updates.start_date)
+    if (updates.end_date) data.end_date = new Date(updates.end_date)
+    if (updates.is_active !== undefined) data.is_active = !!updates.is_active
+    if (updates.is_completed !== undefined) data.is_completed = !!updates.is_completed
+
+    const updated = await prisma.assessmentPeriod.update({ where: { id }, data })
+    return NextResponse.json({ success: true, period: updated })
+  } catch (error) {
+    console.error('API error (PATCH /admin/periods):', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
