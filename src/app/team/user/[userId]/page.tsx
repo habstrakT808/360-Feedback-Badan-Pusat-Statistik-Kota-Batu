@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Loading } from "@/components/ui/Loading";
-import { supabase } from "@/lib/supabase";
 import { TeamService } from "@/lib/team-service";
 import { toast } from "react-hot-toast";
 import { FloatingComments } from "@/components/team/FloatingComments";
@@ -62,6 +61,7 @@ export default function PublicProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
+  const [comments, setComments] = useState<Array<{ id: string; text: string; created_at: string; author?: any }>>([]);
 
   // This state helps prevent race conditions when role loading completes
   // and isSupervisor changes from false to true
@@ -91,35 +91,39 @@ export default function PublicProfilePage() {
       setIsLoading(true);
 
       // Get user profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (profileError) {
-        throw profileError;
+      const profileResponse = await fetch(`/api/team/user/${userId}`);
+      const json = await profileResponse.json();
+      if (!profileResponse.ok) {
+        throw new Error(json?.error || 'Failed to fetch user profile');
       }
 
-             // Check if user allows public view OR if current user is supervisor
-       // Only deny access if profile is private AND user is not a supervisor
-       if (!profileData.allow_public_view && !isSupervisor) {
-         setError("Profil ini bersifat privat");
-         setIsLoading(false);
-         return;
-       }
-       
-       // Clear any previous error if we're a supervisor accessing a private profile
-       if (isSupervisor && !profileData.allow_public_view) {
-         setError(null);
-       }
+      const fetchedProfile = json.profile as any;
+      const allowPublic = !!fetchedProfile?.allow_public_view;
+
+      // Deny only when profile private and current user is not supervisor
+      if (!allowPublic && !isSupervisor) {
+        setError("Profil ini bersifat privat");
+        setIsLoading(false);
+        return;
+      }
+      if (isSupervisor && !allowPublic) {
+        setError(null);
+      }
+
       setProfile({
-        ...profileData,
-        allow_public_view: profileData.allow_public_view || false,
+        id: fetchedProfile.id,
+        full_name: fetchedProfile.full_name,
+        email: fetchedProfile.email,
+        position: fetchedProfile.position,
+        department: fetchedProfile.department,
+        avatar_url: fetchedProfile.avatar_url,
+        allow_public_view: allowPublic,
+        created_at: fetchedProfile.created_at,
       });
 
       // Get performance data
       await loadPerformanceData(userId);
+      await loadComments(userId);
          } catch (error: any) {
        setError(error.message || "Gagal memuat profil");
      } finally {
@@ -130,39 +134,10 @@ export default function PublicProfilePage() {
   const loadPerformanceData = async (userId: string) => {
     try {
       setIsLoadingPerformance(true);
-
-      // Use the new TeamService method to get real performance data
-      const performanceData = await TeamService.getUserPerformance(userId);
-
-      if (performanceData) {
-        setPerformance(performanceData);
-      } else {
-        // Set default performance data if no data found
-        const defaultPerformance = {
-          averageRating: 0,
-          totalFeedback: 0,
-          totalEmployees: 0,
-          maxAssignments: 0,
-          completedAssessments: 0,
-          pendingAssessments: 0,
-          periodProgress: 0,
-          recentScores: [{ period: "Agustus", score: 0 }],
-          strengths: [
-            "Komunikasi yang efektif",
-            "Kerja tim yang baik",
-            "Inisiatif tinggi",
-            "Problem solving",
-            "Leadership",
-            "Kreativitas",
-          ],
-          areasForImprovement: [
-            "Manajemen waktu",
-            "Presentasi publik",
-            "Teknologi terbaru",
-            "Analisis data",
-          ],
-        };
-        setPerformance(defaultPerformance);
+      const res = await fetch(`/api/team/performance?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' })
+      if (res.ok) {
+        const json = await res.json().catch(() => ({}))
+        if (json?.performance) setPerformance(json.performance)
       }
     } catch (error: any) {
       toast.error(`Gagal memuat data performa: ${error.message}`);
@@ -176,7 +151,7 @@ export default function PublicProfilePage() {
         completedAssessments: 0,
         pendingAssessments: 0,
         periodProgress: 0,
-        recentScores: [{ period: "Agustus", score: 0 }],
+        recentScores: [{ period: "Periode", score: 0 }],
         strengths: [
           "Komunikasi yang efektif",
           "Kerja tim yang baik",
@@ -197,6 +172,18 @@ export default function PublicProfilePage() {
       setIsLoadingPerformance(false);
     }
   };
+
+  const loadComments = async (uid: string) => {
+    try {
+      const res = await fetch(`/api/team/comments?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' })
+      if (res.ok) {
+        const json = await res.json().catch(() => ({}))
+        setComments(json?.comments || [])
+      }
+    } catch (e) {
+      // ignore errors, keep comments empty
+    }
+  }
 
   if (isLoading || roleLoading) {
     return (
@@ -617,7 +604,26 @@ export default function PublicProfilePage() {
                   )}
 
                   {activeTab === "strengths" && (
-                    <FloatingComments userId={userId} />
+                    <div className="space-y-4">
+                      {comments.length === 0 ? (
+                        <div className="text-center text-gray-500 py-12">Belum Ada Komentar</div>
+                      ) : (
+                        comments.map((c) => (
+                          <div key={c.id} className="p-4 bg-gray-50 border rounded-lg">
+                            <div className="flex items-center mb-2">
+                              <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 mr-3">
+                                {c.author?.avatar_url ? (
+                                  <img src={c.author.avatar_url} alt={c.author.full_name} className="w-full h-full object-cover" />
+                                ) : null}
+                              </div>
+                              <div className="text-sm text-gray-700 font-medium">{c.author?.full_name || 'Anonim'}</div>
+                              <div className="ml-auto text-xs text-gray-500">{new Date(c.created_at).toLocaleString('id-ID')}</div>
+                            </div>
+                            <div className="text-gray-800">{c.text}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   )}
                 </>
               )}

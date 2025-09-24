@@ -123,6 +123,17 @@ export function PinPeriodAdmin() {
 
   // Removed seeding helpers per request
 
+  const formatDate = (v: any) => {
+    if (!v) return ''
+    try {
+      // Support Date or ISO string
+      const iso = typeof v === 'string' ? v : new Date(v).toISOString()
+      return iso.slice(0, 10)
+    } catch {
+      return String(v).slice(0, 10)
+    }
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
       <div className="p-6 border-b border-gray-200 flex items-center justify-between">
@@ -189,10 +200,10 @@ export function PinPeriodAdmin() {
                 </div>
                 <div className="text-sm text-gray-700 space-y-1 mb-4">
                   <div>
-                    Mulai: <span className="font-medium">{p.start_date}</span>
+                    Mulai: <span className="font-medium">{formatDate(p.start_date)}</span>
                   </div>
                   <div>
-                    Selesai: <span className="font-medium">{p.end_date}</span>
+                    Selesai: <span className="font-medium">{formatDate(p.end_date)}</span>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">

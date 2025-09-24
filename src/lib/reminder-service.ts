@@ -1,5 +1,5 @@
 // src/lib/reminder-service.ts
-import { supabase } from './supabase';
+import { prisma } from './prisma';
 import { NotificationService } from './notification-service';
 import { EmailService } from './email-service';
 
@@ -10,9 +10,9 @@ export interface AssessmentAssignment {
   assessor_id: string;
   assessee_id: string;
   is_completed: boolean | null; // Make nullable to match DB schema
-  completed_at: string | null;
-  created_at: string;
-  updated_at?: string; // Make optional as it might not exist in DB
+  completed_at: Date | null;
+  created_at: Date;
+  updated_at?: Date; // Make optional as it might not exist in DB
   period?: AssessmentPeriod;
   assessor?: UserProfile;
   assessee?: UserProfile;
@@ -22,11 +22,11 @@ export interface AssessmentPeriod {
   id: string;
   month: number;
   year: number;
-  start_date: string;
-  end_date: string;
+  start_date: Date;
+  end_date: Date;
   is_active: boolean | null; // Make nullable to match DB schema
-  created_at: string;
-  updated_at?: string; // Make optional as it might not exist in DB
+  created_at: Date;
+  updated_at?: Date; // Make optional as it might not exist in DB
 }
 
 export interface UserProfile {
@@ -36,8 +36,8 @@ export interface UserProfile {
   full_name: string;
   position: string | null; // Make nullable to match DB schema
   department: string | null; // Make nullable to match DB schema
-  created_at: string;
-  updated_at?: string; // Make optional as it might not exist in DB
+  created_at: Date;
+  updated_at?: Date; // Make optional as it might not exist in DB
 }
 
 export interface ReminderConfig {
@@ -105,17 +105,13 @@ export class ReminderService {
   // Advanced period retrieval with caching
   private static async getActivePeriod(periodId: string): Promise<AssessmentPeriod | null> {
     try {
-      const { data, error } = await supabase
-        .from('assessment_periods')
-        .select('*')
-        .eq('id', periodId)
-        .eq('is_active', true)
-        .single();
+      const data = await prisma.assessmentPeriod.findUnique({
+        where: { 
+          id: periodId,
+          is_active: true
+        }
+      });
 
-      if (error || !data) {
-        // Don't log error, just return null gracefully
-        return null;
-      }
       return data;
     } catch (error) {
       // Don't log error, just return null gracefully
@@ -126,25 +122,47 @@ export class ReminderService {
   // Advanced assignment retrieval with relationships
   private static async getPeriodAssignments(periodId: string): Promise<AssessmentAssignment[]> {
     try {
-      const { data, error } = await supabase
-        .from('assessment_assignments')
-        .select(`
-          *,
-                      period:assessment_periods(
-              id,
-              month,
-              year,
-              is_active,
-              start_date,
-              end_date,
-              created_at
-            ),
-          assessor:profiles!assessment_assignments_assessor_id_fkey(*),
-          assessee:profiles!assessment_assignments_assessee_id_fkey(*)
-        `)
-        .eq('period_id', periodId);
+      const data = await prisma.assessmentAssignment.findMany({
+        where: {
+          period_id: periodId
+        },
+        include: {
+          period: {
+            select: {
+              id: true,
+              month: true,
+              year: true,
+              is_active: true,
+              start_date: true,
+              end_date: true,
+              created_at: true
+            }
+          },
+          assessor: {
+            select: {
+              id: true,
+              full_name: true,
+              email: true,
+              username: true,
+              position: true,
+              department: true,
+              created_at: true
+            }
+          },
+          assessee: {
+            select: {
+              id: true,
+              full_name: true,
+              email: true,
+              username: true,
+              position: true,
+              department: true,
+              created_at: true
+            }
+          }
+        }
+      });
 
-      if (error) throw error;
       return data || [];
     } catch (error) {
       // Don't log error, just return empty array gracefully
@@ -258,15 +276,16 @@ export class ReminderService {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      const { count, error } = await supabase
-        .from('reminder_logs')
-        .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId)
-        .eq('period_id', periodId)
-        .gte('sent_at', `${today}T00:00:00`)
-        .lte('sent_at', `${today}T23:59:59`);
-
-      if (error) throw error;
+      const count = await prisma.reminderLog.count({
+        where: {
+          user_id: userId,
+          period_id: periodId,
+          sent_at: {
+            gte: new Date(`${today}T00:00:00`),
+            lte: new Date(`${today}T23:59:59`)
+          }
+        }
+      });
       
       return (count || 0) < this.DEFAULT_CONFIG.max_reminders_per_day;
     } catch (error) {
@@ -365,14 +384,12 @@ export class ReminderService {
   ): Promise<void> {
     try {
       // Get user profile for email
-      const { data: profile, error } = await supabase
-        .from('profiles')
-      .select('*')
-        .eq('id', userId)
-        .single();
+      const profile = await prisma.profile.findUnique({
+        where: { id: userId }
+      });
 
-      if (error || !profile) {
-        console.error('Failed to get user profile for email reminder:', error);
+      if (!profile) {
+        console.error('Failed to get user profile for email reminder');
         return;
       }
 

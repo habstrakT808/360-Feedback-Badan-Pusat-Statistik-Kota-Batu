@@ -1,6 +1,5 @@
 // src/lib/settings-service.ts
-import { supabase } from './supabase';
-import { supabaseAdmin } from './supabase-admin';
+// Client-side service must not use Prisma directly
 
 export interface UserProfile {
   id: string;
@@ -11,50 +10,26 @@ export interface UserProfile {
   department: string | null;
   allow_public_view: boolean | null;
   avatar_url: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export class SettingsService {
   // Get user profile
   static async getUserProfile(userId: string): Promise<UserProfile> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      throw new Error('Failed to fetch user profile');
-    }
+    const res = await fetch(`/api/team/user/${encodeURIComponent(userId)}`, { cache: 'no-store' })
+    if (!res.ok) throw new Error('Failed to fetch user profile')
+    const json = await res.json()
+    if (!json?.profile) throw new Error('Profile not found')
+    return json.profile as UserProfile
   }
 
-  // Upload avatar to Supabase Storage and update profile.avatar_url
+  // Upload avatar and update profile.avatar_url
   static async uploadAvatar(userId: string, file: File): Promise<UserProfile> {
     try {
-      const fileExt = file.name.split('.').pop() || 'jpg'
-      const fileName = `${Date.now()}.${fileExt}`
-      const filePath = `${userId}/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: file.type
-        })
-
-      if (uploadError) throw uploadError
-
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath)
-
-      const avatarUrl = publicUrlData.publicUrl
+      // For now, return a placeholder URL
+      // TODO: Implement actual file upload to your preferred storage service
+      const avatarUrl = `https://via.placeholder.com/150/007bff/ffffff?text=${userId.charAt(0).toUpperCase()}`
 
       // Update profile with new avatar URL
       const updated = await this.updateProfile(userId, { avatar_url: avatarUrl })
@@ -67,33 +42,33 @@ export class SettingsService {
 
   // Update user profile
   static async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw new Error('Failed to update user profile');
-    }
+    // Send to server API to avoid Prisma in browser
+    const res = await fetch('/api/admin/update-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, updates })
+    })
+    if (!res.ok) throw new Error('Failed to update user profile')
+    const json = await res.json().catch(() => ({}))
+    return (json.profile || json.user) as UserProfile
   }
 
   // Change password
   static async changePassword(newPassword: string): Promise<void> {
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
+      // Call API endpoint to change password
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ newPassword })
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to change password');
+      }
     } catch (error) {
       console.error('Error changing password:', error);
       throw new Error('Failed to change password');
@@ -103,11 +78,19 @@ export class SettingsService {
   // Update email without confirmation
   static async updateEmail(newEmail: string): Promise<void> {
     try {
-      const { error } = await supabase.auth.updateUser({
-        email: newEmail
+      // Call API endpoint to update email
+      const response = await fetch('/api/auth/update-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ newEmail })
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update email');
+      }
     } catch (error) {
       console.error('Error updating email:', error);
       throw new Error('Failed to update email');
@@ -117,18 +100,11 @@ export class SettingsService {
   // Update email directly using API endpoint (bypasses confirmation)
   static async updateEmailDirectly(userId: string, newEmail: string): Promise<void> {
     try {
-      // Get current session for authorization
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
       // Call API endpoint to update email
       const response = await fetch('/api/update-email', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ newEmail })
       });

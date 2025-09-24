@@ -33,12 +33,12 @@ import {
   X,
   Youtube,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useStore } from "@/store/useStore";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "react-hot-toast";
+import { signIn } from "next-auth/react";
 
 const loginSchema = z.object({
   email: z.string().email("Email tidak valid"),
@@ -76,16 +76,8 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
-        router.push("/dashboard");
-      }
-    };
-    getUser();
+    // Check if user is already logged in via NextAuth
+    // This will be handled by the auth system
   }, [setUser, router]);
 
   // Scroll snap effect - Disabled on mobile
@@ -192,13 +184,25 @@ export default function HomePage() {
   const onLogin = async (data: LoginForm) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword(data);
-      if (error) throw error;
-
-      toast.success("Login berhasil!");
-      router.push("/dashboard");
+      const res = await signIn("credentials", {
+        redirect: false,
+        email: data.email,
+        password: data.password,
+      });
+      if (res?.error) {
+        toast.error("Email atau password salah");
+        return;
+      }
+      // fetch role and redirect
+      const roleRes = await fetch("/api/me/role", { cache: "no-store" });
+      const roleJson = await roleRes.json().catch(() => ({ role: "user" }));
+      const role = roleJson.role || "user";
+      setIsAuthModalOpen(false);
+      if (role === "admin") router.replace("/admin");
+      else if (role === "supervisor") router.replace("/dashboard");
+      else router.replace("/dashboard");
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error("Terjadi kesalahan");
     } finally {
       setIsLoading(false);
     }
@@ -207,37 +211,14 @@ export default function HomePage() {
   const onRegister = async (data: RegisterForm) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            full_name: data.fullName,
-            position: data.position,
-            department: data.department,
-          },
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success("Registrasi berhasil! Silakan cek email untuk verifikasi.");
+      // Registration should be handled by admin
+      toast("Registrasi hanya dapat dilakukan oleh admin. Silakan hubungi administrator.");
       setAuthMode("login");
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error("Terjadi kesalahan");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-    if (error) toast.error(error.message);
   };
 
   const features = [
@@ -961,7 +942,7 @@ export default function HomePage() {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         type="button"
-                        onClick={signInWithGoogle}
+                        onClick={() => toast("Google login tidak tersedia")}
                         className="w-full flex items-center justify-center py-3 border border-gray-300 rounded-xl font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all"
                       >
                         <div className="mr-2">

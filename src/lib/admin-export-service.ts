@@ -1,7 +1,8 @@
 // src/lib/admin-export-service.ts
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
-import { supabase } from '@/lib/supabase';
+import { getSession } from 'next-auth/react';
+
 
 interface ExportOptions {
   dataType: "assessments" | "pins" | "triwulan";
@@ -18,7 +19,7 @@ export class AdminExportService {
   static async exportData(options: ExportOptions) {
     try {
       // Get session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSession();
       if (!session) {
         throw new Error('User not authenticated');
       }
@@ -27,8 +28,7 @@ export class AdminExportService {
       const response = await fetch('/api/admin/export', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           dataType: options.dataType,
@@ -44,7 +44,9 @@ export class AdminExportService {
         throw new Error(errorData.error || 'Failed to fetch data');
       }
 
-      const { data } = await response.json();
+      const json = await response.json();
+      const data = json?.data;
+      const meta = json?.meta;
       let filename = '';
 
       switch (options.dataType) {
@@ -59,7 +61,7 @@ export class AdminExportService {
           break;
       }
 
-      this.exportToExcel(data, options, filename);
+      this.exportToExcel({ data, meta }, options, filename);
     } catch (error) {
       console.error('Export error:', error);
       throw new Error('Gagal mengexport data');
@@ -68,8 +70,9 @@ export class AdminExportService {
 
 
 
-  private static exportToExcel(data: any, options: ExportOptions, filename: string) {
-    console.log('Export to Excel - dataType:', options.dataType, 'data:', data);
+  private static exportToExcel(payload: any, options: ExportOptions, filename: string) {
+    const { data, meta } = payload || {};
+    console.log('Export to Excel - dataType:', options.dataType, 'data:', data, 'meta:', meta);
     
     const workbook = XLSX.utils.book_new();
 
@@ -80,7 +83,7 @@ export class AdminExportService {
     } else if (options.dataType === 'pins') {
       this.addPinSheets(workbook, data);
     } else if (options.dataType === 'triwulan') {
-      this.addTriwulanSheets(workbook, data);
+      this.addTriwulanSheets(workbook, { data, meta });
     }
 
     // Check if workbook has any sheets
@@ -260,53 +263,17 @@ export class AdminExportService {
     XLSX.utils.book_append_sheet(workbook, receiversSheet, 'Top Receivers');
   }
 
-  private static addTriwulanSheets(workbook: XLSX.WorkBook, data: any) {
-    // Extract ranking data and detailed ratings
-    const rankingData = Array.isArray(data) ? data : (data.ranking || []);
-    const detailedRatings = data.detailedRatings || [];
+  private static addTriwulanSheets(workbook: XLSX.WorkBook, payload: any) {
+    const { data, meta } = payload || {};
+    // Extract ranking data and detailed ratings from API shape
+    const rankingData = meta?.ranking || [];
+    const detailedRatings = Array.isArray(data) ? data : (data?.detailedRatings || []);
 
     console.log('Triwulan data:', { rankingData: rankingData.length, detailedRatings: detailedRatings.length });
 
-    // Sheet 1: Detail Per Aspek (Setiap baris = 1 penilai, 1 kandidat, 1 aspek)
-    if (detailedRatings.length > 0) {
-      const aspectDetailRows: any[][] = [];
-      
-      detailedRatings.forEach((rating: any) => {
-        const aspects = [
-          { name: 'Aspek 1', value: rating.c1 },
-          { name: 'Aspek 2', value: rating.c2 },
-          { name: 'Aspek 3', value: rating.c3 },
-          { name: 'Aspek 4', value: rating.c4 },
-          { name: 'Aspek 5', value: rating.c5 },
-          { name: 'Aspek 6', value: rating.c6 },
-          { name: 'Aspek 7', value: rating.c7 },
-          { name: 'Aspek 8', value: rating.c8 },
-          { name: 'Aspek 9', value: rating.c9 },
-          { name: 'Aspek 10', value: rating.c10 },
-          { name: 'Aspek 11', value: rating.c11 },
-          { name: 'Aspek 12', value: rating.c12 },
-          { name: 'Aspek 13', value: rating.c13 }
-        ];
-        
-        aspects.forEach(aspect => {
-          aspectDetailRows.push([
-            rating.rater_name,
-            rating.rater_email,
-            rating.candidate_name,
-            rating.candidate_email,
-            aspect.name,
-            aspect.value
-          ]);
-        });
-      });
-      
-      const aspectDetailHeader = ['Penilai', 'Email Penilai', 'Kandidat', 'Email Kandidat', 'Aspek', 'Nilai'];
-      const aspectDetailSheet = XLSX.utils.aoa_to_sheet([aspectDetailHeader, ...aspectDetailRows]);
-      this.styleSheet(aspectDetailSheet, aspectDetailHeader.length, aspectDetailRows);
-      XLSX.utils.book_append_sheet(workbook, aspectDetailSheet, 'Detail Per Aspek');
-    }
+    // Removed: Detail Per Aspek sheet per request. We will only export two sheets below.
 
-    // Sheet 2: Summary Penilaian (Format lama untuk referensi)
+    // Sheet 1: Summary Penilaian
     if (detailedRatings.length > 0) {
       const detHeader = [
         'Penilai', 'Email Penilai', 'Kandidat', 'Email Kandidat',
@@ -314,26 +281,28 @@ export class AdminExportService {
         'Aspek 9', 'Aspek 10', 'Aspek 11', 'Aspek 12', 'Aspek 13'
       ];
       const detRows = detailedRatings.map((r: any) => [
-        r.rater_name, r.rater_email, r.candidate_name, r.candidate_email, 
-        r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13
+        r['Penilai'], r['Email Penilai'], r['Kandidat'], r['Email Kandidat'], 
+        r['Aspek 1'], r['Aspek 2'], r['Aspek 3'], r['Aspek 4'], r['Aspek 5'], r['Aspek 6'], r['Aspek 7'], r['Aspek 8'], r['Aspek 9'], r['Aspek 10'], r['Aspek 11'], r['Aspek 12'], r['Aspek 13']
       ]);
       const detSheet = XLSX.utils.aoa_to_sheet([detHeader, ...detRows]);
       this.styleSheet(detSheet, detHeader.length, detRows);
-      XLSX.utils.book_append_sheet(workbook, detSheet, 'Summary Penilaian');
+      const label = meta?.period_label ? `Summary Penilaian (${meta.period_label})` : 'Summary Penilaian';
+      XLSX.utils.book_append_sheet(workbook, detSheet, label);
     }
 
-    // Sheet 3: Ranking dan Skor Akhir
+    // Sheet 2: Ranking dan Skor Akhir
     if (rankingData.length > 0) {
       const header = ['Peringkat', 'Nama', 'Email', 'Skor Akhir'];
       const rows = rankingData.map((r: any, index: number) => [
-        index + 1, // Peringkat
-        r.name, 
-        r.email, 
-        r.score
+        index + 1,
+        r.candidate_name || r.name,
+        r.email || '',
+        r.total_score || r.score
       ]);
       const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
       this.styleSheet(sheet, header.length, rows);
-      XLSX.utils.book_append_sheet(workbook, sheet, 'Perangkingan');
+      const label = meta?.period_label ? `Perangkingan (${meta.period_label})` : 'Perangkingan';
+      XLSX.utils.book_append_sheet(workbook, sheet, label);
     }
 
     // Fallback: Jika tidak ada data sama sekali, buat sheet kosong dengan pesan

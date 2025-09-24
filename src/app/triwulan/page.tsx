@@ -5,9 +5,10 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Loading } from "@/components/ui/Loading";
 import { TriwulanPeriodService } from "@/lib/triwulan-period-service";
 import { TriwulanService } from "@/lib/triwulan-service";
-import { supabase } from "@/lib/supabase";
 import { RolesService } from "@/lib/roles-service";
 import { toast } from "react-hot-toast";
+import { getSession } from "next-auth/react";
+import { prisma } from "@/lib/prisma";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -45,8 +46,9 @@ export default function TriwulanAssessmentPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase.auth.getUser();
-        const uid = data.user?.id || null;
+        // Get user ID from session
+        const session = await getSession();
+        const uid = session?.user && 'id' in session.user ? session.user.id as string : null;
         setUserId(uid);
 
         const p = await TriwulanPeriodService.getActive();
@@ -80,8 +82,20 @@ export default function TriwulanAssessmentPage() {
           } catch {}
         }
 
-        // Determine initial phase
-        if ((cand || []).length > 5) {
+        // Determine initial phase (respect edit mode)
+        let editMode = false
+        if (typeof window !== 'undefined') {
+          try {
+            const params = new URLSearchParams(window.location.search)
+            editMode = params.get('edit') === '1'
+          } catch {}
+        }
+
+        if (editMode) {
+          // Always open shortlist first and prefill previous ratings if any
+          setShortlisted((cand || []).map((c: any) => c.user_id))
+          setStep('shortlist')
+        } else if ((cand || []).length > 5) {
           const info = await TriwulanService.getVotingStatus(p.id);
           setVotingInfo({
             requiredCount: info.requiredCount,
@@ -97,52 +111,59 @@ export default function TriwulanAssessmentPage() {
         } else {
           // If 5 or fewer candidates, automatically set shortlist and go to rating
           setShortlisted((cand || []).map((c: any) => c.user_id));
-          // Check if user has already completed ratings for all candidates
-          if (uid) {
-            try {
-              const existingMap = await TriwulanService.getUserRatingsMap(p.id, uid);
-              const allRated = (cand || []).every((c: any) => {
-                const ratings = existingMap[c.user_id];
-                return Array.isArray(ratings) && ratings.length === 13 && ratings.every(Boolean);
-              });
-              if (allRated) {
-                setStep("shortlist");
-              } else {
+          if (editMode) {
+            setStep('shortlist')
+          } else {
+            // Check if user has already completed ratings for all candidates
+            if (uid) {
+              try {
+                const existingMap = await TriwulanService.getUserRatingsMap(p.id, uid);
+                const allRated = (cand || []).every((c: any) => {
+                  const rts = existingMap[c.user_id];
+                  return Array.isArray(rts) && rts.length === 13 && rts.every(Boolean);
+                });
+                if (allRated) {
+                  setStep("shortlist");
+                } else {
+                  setStep("rate");
+                  setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
+                }
+              } catch {
                 setStep("rate");
                 setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
               }
-            } catch {
-              // If error checking ratings, default to rating step
+            } else {
               setStep("rate");
               setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
             }
-          } else {
-            setStep("rate");
-            setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
           }
         }
 
-        // Load profile names for display
+        // Load profile names for display (via API, not Prisma in client)
         const ids = cand.map((c) => c.user_id);
         if (ids.length) {
-          const { data: profs, error } = await supabase
-            .from("profiles")
-            .select("id, full_name, department, position, avatar_url")
-            .in("id", ids);
-          if (!error && profs) {
-            const map: Record<string, any> = {};
-            profs.forEach((p) => (map[p.id] = p));
-            setProfiles(map);
+          try {
+            const res = await fetch(`/api/team/batch?ids=${encodeURIComponent(ids.join(','))}`, { cache: 'no-store' })
+            if (res.ok) {
+              const json = await res.json().catch(() => ({ profiles: [] }))
+              const profs = json.profiles || []
+              const map: Record<string, any> = {}
+              profs.forEach((p: any) => (map[p.id] = p))
+              setProfiles(map)
+            }
+          } catch (error) {
+            console.error("Error loading profiles:", error)
           }
-          // Prefetch existing ratings to derive status badges
+          // Prefetch existing ratings to derive status badges (and prefill for edit)
           if (uid) {
             try {
-              const existingMap = await TriwulanService.getUserRatingsMap(
-                p.id,
-                uid
-              );
+              const existingMap = await TriwulanService.getUserRatingsMap(p.id, uid)
               if (existingMap && Object.keys(existingMap).length > 0) {
-                setRatings((prev) => ({ ...existingMap, ...prev }));
+                const normalized: Record<string, number[]> = {}
+                Object.entries(existingMap).forEach(([k, arr]) => {
+                  normalized[k] = Array.isArray(arr) ? (arr as any[]).map((x) => Number(x)) : []
+                })
+                setRatings((prev) => ({ ...normalized, ...prev }))
               }
             } catch {}
           }
@@ -271,9 +292,10 @@ export default function TriwulanAssessmentPage() {
           activeCandidateId
         );
         if (existing && existing.length === 13) {
+          const nums = (existing as any[]).map((x) => Number(x))
           setRatings((prev) => ({
             ...prev,
-            [activeCandidateId]: existing as any,
+            [activeCandidateId]: nums as any,
           }));
         }
       } catch {}

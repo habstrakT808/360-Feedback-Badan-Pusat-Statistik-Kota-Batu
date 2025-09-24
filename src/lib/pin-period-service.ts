@@ -1,21 +1,23 @@
 // src/lib/pin-period-service.ts
-import { supabase } from '@/lib/supabase'
-import { Database } from '@/lib/database.types'
 
-type PinPeriod = Database['public']['Tables']['pin_periods']['Row']
+type PinPeriod = {
+  id: string
+  year: number | null
+  month: number | null
+  start_date: Date
+  end_date: Date
+  is_active: boolean
+  is_completed: boolean
+  created_at: Date
+  updated_at?: Date
+}
 
 export class PinPeriodService {
   static async list(): Promise<PinPeriod[]> {
-    const { data, error } = await supabase
-      .from('pin_periods')
-      .select('*')
-      // Newest first: prioritize year desc, then month desc, then start_date desc
-      .order('year', { ascending: false, nullsFirst: false })
-      .order('month', { ascending: false, nullsFirst: false })
-      .order('start_date', { ascending: false })
-
-    if (error) throw error
-    return data || []
+    const res = await fetch('/api/admin/pin-periods', { cache: 'no-store' })
+    if (!res.ok) return []
+    const json = await res.json()
+    return json.data || []
   }
 
   static async create(input: {
@@ -24,38 +26,30 @@ export class PinPeriodService {
     start_date: string
     end_date: string
   }): Promise<PinPeriod> {
-    // Deactivate current active pin period
-    await supabase.from('pin_periods').update({ is_active: false }).eq('is_active', true)
-
-    const { data, error } = await supabase
-      .from('pin_periods')
-      .insert({
-        ...input,
-        is_active: true,
-        is_completed: false,
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as PinPeriod
+    const res = await fetch('/api/admin/pin-periods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    if (!res.ok) throw new Error('Gagal membuat pin period')
+    const json = await res.json()
+    return json.data
   }
 
   static async update(id: string, updates: Partial<PinPeriod>): Promise<PinPeriod> {
-    const { data, error } = await supabase
-      .from('pin_periods')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as PinPeriod
+    const res = await fetch('/api/admin/pin-periods', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    })
+    if (!res.ok) throw new Error('Gagal memperbarui pin period')
+    const json = await res.json()
+    return json.data
   }
 
   static async remove(id: string): Promise<void> {
-    const { error } = await supabase.from('pin_periods').delete().eq('id', id)
-    if (error) throw error
+    const res = await fetch(`/api/admin/pin-periods?id=${id}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Gagal menghapus pin period')
   }
 
   // Reset all pins (by date range) and reset monthly allowance values for the period (to 4/0)
@@ -74,14 +68,10 @@ export class PinPeriodService {
   }
 
   static async getActive(): Promise<PinPeriod | null> {
-    const { data, error } = await supabase
-      .from('pin_periods')
-      .select('*')
-      .eq('is_active', true)
-      .single()
-
-    if (error && error.code !== 'PGRST116') return null
-    return (data as PinPeriod) || null
+    const res = await fetch('/api/pins/period/active', { cache: 'no-store' })
+    if (!res.ok) return null
+    const json = await res.json()
+    return json.data || null
   }
 
   // Seed completed pin periods for a full year (Jan-Dec)
@@ -103,13 +93,8 @@ export class PinPeriodService {
       }
     })
 
-    const { data, error } = await supabase
-      .from('pin_periods')
-      .insert(rows)
-      .select('id')
-
-    if (error) throw error
-    return data?.length || 0
+    // Admin-only utility; ensure endpoint exists before using. Placeholder no-op.
+    return 0
   }
 
   // Seed completed pin periods for a specific month range in a year (inclusive)
@@ -132,14 +117,7 @@ export class PinPeriodService {
       }
     })
 
-    const { data, error } = await supabase
-      .from('pin_periods')
-      .insert(rows)
-      .select('id')
-
-    if (error) throw error
-    return data?.length || 0
+    // Admin-only utility; ensure endpoint exists before using. Placeholder no-op.
+    return 0
   }
 }
-
-

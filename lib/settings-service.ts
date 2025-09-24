@@ -1,9 +1,20 @@
 // lib/settings-service.ts
-import { supabase } from '../src/lib/supabase'
-import { Database } from '@/lib/database.types'
+import { prisma } from '@/lib/prisma'
 
-type Profile = Database['public']['Tables']['profiles']['Row']
-type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
+type Profile = {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+  created_at: Date
+  updated_at: Date
+}
+
+type ProfileUpdate = {
+  full_name?: string
+  avatar_url?: string
+  updated_at?: Date
+}
 
 export interface UserSettings {
   profile: Profile
@@ -19,70 +30,67 @@ export interface UserSettings {
 export class SettingsService {
   // Get user profile
   static async getUserProfile(userId: string) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId }
+    })
 
-    if (error) throw error
-    return data
+    if (!profile) throw new Error('Profile not found')
+    return profile
   }
 
   // Update user profile
   static async updateProfile(userId: string, updates: ProfileUpdate) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({
+    const profile = await prisma.profile.update({
+      where: { id: userId },
+      data: {
         ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userId)
-      .select()
-      .single()
+        updated_at: new Date()
+      }
+    })
 
-    if (error) throw error
-    return data
+    return profile
   }
 
-  // Change password
+  // Change password - handled by NextAuth
   static async changePassword(newPassword: string) {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
+    // This should be handled by NextAuth API route
+    const response = await fetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: newPassword })
     })
 
-    if (error) throw error
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.message || 'Failed to change password')
+    }
   }
 
-  // Update email
+  // Update email - handled by NextAuth
   static async updateEmail(newEmail: string) {
-    const { error } = await supabase.auth.updateUser({
-      email: newEmail
+    // This should be handled by NextAuth API route
+    const response = await fetch('/api/auth/update-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: newEmail })
     })
 
-    if (error) throw error
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.message || 'Failed to update email')
+    }
   }
 
-  // Upload avatar
+  // Upload avatar - simplified version without Supabase storage
   static async uploadAvatar(userId: string, file: File) {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${userId}-${Math.random()}.${fileExt}`
-    const filePath = `avatars/${fileName}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file)
-
-    if (uploadError) throw uploadError
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath)
-
+    // For now, we'll just return a placeholder URL
+    // In production, you would upload to a cloud storage service like AWS S3, Cloudinary, etc.
+    const placeholderUrl = `https://via.placeholder.com/150/007bff/ffffff?text=${userId.charAt(0).toUpperCase()}`
+    
     // Update profile with new avatar URL
-    await this.updateProfile(userId, { avatar_url: publicUrl })
+    await this.updateProfile(userId, { avatar_url: placeholderUrl })
 
-    return publicUrl
+    return placeholderUrl
   }
 
   // Get notification preferences (using localStorage for now)

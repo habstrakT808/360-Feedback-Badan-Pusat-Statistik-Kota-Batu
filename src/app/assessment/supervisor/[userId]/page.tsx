@@ -77,8 +77,8 @@ export default function SupervisorAssessmentPage() {
       setCurrentPeriod(periodData);
 
       // Get all assessable users to find target user
-      const users = await SupervisorService.getAllAssessableUsers();
-      const target = users.find((u) => u.id === userId);
+      const users = await SupervisorService.getAllAssessableUsers();     
+      const target = users.find((u: any) => u.id === userId);
       if (!target) {
         toast.error("Pengguna tidak ditemukan atau tidak dapat dinilai");
         router.push("/assessment");
@@ -89,7 +89,8 @@ export default function SupervisorAssessmentPage() {
       // Check if assessment already exists
       const hasAssessed = await SupervisorService.hasAssessedUser(
         userId,
-        periodData.id
+        periodData.id,
+        user!.id
       );
       setHasExistingAssessment(hasAssessed);
 
@@ -98,7 +99,8 @@ export default function SupervisorAssessmentPage() {
         const existingResponses =
           await SupervisorService.getExistingSupervisorAssessment(
             userId,
-            periodData.id
+            periodData.id,
+            user!.id
           );
 
         // Group existing responses by aspect (since we're now doing per-aspect assessment)

@@ -3,7 +3,7 @@ import { useUserRole } from '@/hooks/useUserRole'
 import { Loading } from '@/components/ui/Loading'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { useUser } from '@/store/useStore'
+import { useSession } from 'next-auth/react'
 
 interface AdminGuardProps {
   children: ReactNode
@@ -12,19 +12,18 @@ interface AdminGuardProps {
 
 export function AdminGuard({ children, fallback }: AdminGuardProps) {
   const { isAdmin, isLoading } = useUserRole()
-  const user = useUser()
+  const { data: session, status } = useSession()
   const router = useRouter()
 
   useEffect(() => {
-    // Only redirect if we're sure user is not admin and not loading
-    if (!isLoading && !isAdmin && user) {
+    if (!isLoading && !isAdmin && status === 'authenticated') {
       console.log('AdminGuard: User is not admin, redirecting to dashboard')
       router.push('/dashboard')
     }
-  }, [isAdmin, isLoading, router, user])
+  }, [isAdmin, isLoading, router, status])
 
   // Show loading while checking user role
-  if (isLoading || !user) {
+  if (isLoading || status === 'loading') {
     return (
       <div className="flex justify-center items-center py-20">
         <Loading size="lg" text="Memverifikasi akses admin..." />

@@ -1,7 +1,8 @@
 // src/app/api/daily-reminders/route.ts
 import { NextResponse } from 'next/server'
 import { SmartNotificationServiceImproved } from '@/lib/smart-notification-service'
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
+
 
 export async function POST() {
   try {
@@ -29,20 +30,18 @@ export async function GET() {
     console.log('🔍 Checking daily reminder status...')
     
     // Get current active periods
-    const { data: activePeriods } = await supabase
-      .from('assessment_periods')
-      .select('*')
-      .eq('is_active', true)
+    const activePeriods = await prisma.assessmentPeriod.findMany({
+      where: { is_active: true }
+    })
 
-    const { data: activePinPeriods } = await supabase
-      .from('pin_periods')
-      .select('*')
-      .eq('is_active', true)
+    const activePinPeriods = await prisma.pinPeriod.findMany({
+      where: { is_active: true }
+    })
 
-    const { data: activeTriwulanPeriods } = await supabase
-      .from('triwulan_periods')
-      .select('*')
-      .eq('is_active', true)
+    // Note: triwulan_periods model is not available in current schema
+    // const activeTriwulanPeriods = await prisma.triwulanPeriod.findMany({
+    //   where: { is_active: true }
+    // })
 
     return NextResponse.json({
       success: true,
@@ -50,7 +49,7 @@ export async function GET() {
       active_periods: {
         assessment: activePeriods?.length || 0,
         pin: activePinPeriods?.length || 0,
-        triwulan: activeTriwulanPeriods?.length || 0
+        triwulan: 0 // TODO: Implement when triwulan model is available
       },
       timestamp: new Date().toISOString()
     })

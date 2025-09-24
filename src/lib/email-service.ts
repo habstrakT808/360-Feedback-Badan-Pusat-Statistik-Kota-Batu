@@ -1,5 +1,5 @@
 // src/lib/email-service.ts
-import { supabase } from './supabase';
+import { prisma } from './prisma';
 import { NotificationService } from './notification-service';
 
 // Advanced email service with comprehensive functionality
@@ -183,12 +183,12 @@ export class EmailService {
     const emailList = Array.isArray(emails) ? emails : [emails];
     
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('email', emailList);
-      
-      if (error) throw error;
+      const profiles = await prisma.profile.findMany({
+        where: {
+          email: { in: emailList }
+        },
+        select: { id: true }
+      });
       
       return profiles?.map(p => p.id) || [];
     } catch (error) {

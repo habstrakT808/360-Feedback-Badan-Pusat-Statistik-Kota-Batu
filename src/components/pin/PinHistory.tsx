@@ -23,9 +23,7 @@ interface PinHistoryItem {
     full_name: string;
     avatar_url: string | null;
   };
-  created_at: string;
-  week_number: number;
-  year: number;
+  given_at: string;
 }
 
 interface PinHistoryProps {
@@ -79,12 +77,17 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
   const loadPinHistory = async () => {
     try {
       setIsLoading(true);
-      const history = await PinService.getPinHistory(
-        user!.id,
-        selectedMonth || undefined,
-        selectedYear || undefined
-      );
-      setPinHistory(history);
+      // Fetch by selected month/year if specified
+      let url = '/api/pins/history'
+      if (selectedMonth && selectedYear) {
+        const qs = new URLSearchParams({ month: String(selectedMonth), year: String(selectedYear) })
+        url = `/api/pins/history?${qs.toString()}`
+      }
+      const res = await fetch(url, { cache: 'no-store' })
+      const json = await res.json().catch(() => ({ pins: [] }))
+      const pins: any[] = Array.isArray(json.pins) ? json.pins : []
+      // API sudah menyaring berdasarkan pengguna yang login; simpan apa adanya
+      setPinHistory(pins as any)
     } catch (error) {
       console.error("Error loading pin history:", error);
     } finally {
@@ -119,9 +122,20 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
     if (!confirm("Batalkan pin ini?")) return;
     try {
       setIsCancelling(pinId);
-      const updated = await PinService.cancelPin(pinId, user.id);
+      const res = await fetch('/api/pins/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinId })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Gagal membatalkan pin')
+      }
+      const json = await res.json().catch(() => ({}))
       await loadPinHistory();
-      onAfterCancel && onAfterCancel((updated as any)?.pins_remaining);
+      if (onAfterCancel && json?.allowance?.pins_remaining !== undefined) {
+        onAfterCancel(json.allowance.pins_remaining)
+      }
     } catch (e: any) {
       console.error(e);
       alert(e.message || "Gagal membatalkan pin");
@@ -327,24 +341,16 @@ export function PinHistory({ onAfterCancel }: PinHistoryProps) {
                     </h4>
                     <div className="flex items-center space-x-4 text-sm text-gray-500">
                       <span>
-                        {getMonthLabel(
-                          (pin as any).month ||
-                            new Date(pin.created_at).getMonth() + 1,
-                          pin.year
-                        )}
+                        {new Date(pin.given_at).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
                       </span>
                       <span>•</span>
-                      <span>{formatDate(pin.created_at)}</span>
+                      <span>{formatDate(pin.given_at)}</span>
                     </div>
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center space-x-2">
-                    {canCancelPin(
-                      (pin as any).month ||
-                        new Date(pin.created_at).getMonth() + 1,
-                      pin.year
-                    ) ? (
+                    {canCancelPin(new Date(pin.given_at).getMonth() + 1, new Date(pin.given_at).getFullYear()) ? (
                       <button
                         onClick={() => handleCancel(pin.id)}
                         disabled={isCancelling === pin.id}

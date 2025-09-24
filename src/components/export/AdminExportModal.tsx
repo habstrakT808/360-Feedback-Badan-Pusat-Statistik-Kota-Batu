@@ -19,7 +19,7 @@ import {
 import { AdminExportService } from "@/lib/admin-export-service";
 import { toast } from "react-hot-toast";
 import { useUserRole } from "@/hooks/useUserRole";
-import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 
 interface AdminExportModalProps {
   isOpen: boolean;
@@ -62,6 +62,7 @@ const monthNames = [
 ];
 
 export function AdminExportModal({ isOpen, onClose }: AdminExportModalProps) {
+  const { data: session } = useSession();
   const { isAdmin, isSupervisor } = useUserRole();
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -104,18 +105,11 @@ export function AdminExportModal({ isOpen, onClose }: AdminExportModalProps) {
 
   const fetchPeriods = async () => {
     try {
-      const endpoint =
-        exportOptions.dataType === "pins"
-          ? "/api/admin/pin-periods"
-          : "/api/admin/periods";
+      let endpoint = "/api/admin/periods";
+      if (exportOptions.dataType === "pins") endpoint = "/api/admin/pin-periods";
+      if (exportOptions.dataType === "triwulan") endpoint = "/api/admin/triwulan";
       const response = await fetch(endpoint, {
-        headers: {
-          Authorization: `Bearer ${
-            (
-              await supabase.auth.getSession()
-            ).data.session?.access_token
-          }`,
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
       const { data, error } = await response.json();
       if (error) throw error;
@@ -339,7 +333,9 @@ export function AdminExportModal({ isOpen, onClose }: AdminExportModalProps) {
                             <option value="">Pilih periode...</option>
                             {periods.map((period) => (
                               <option key={period.id} value={period.id}>
-                                {monthNames[period.month - 1]} {period.year}
+                                {exportOptions.dataType === 'triwulan'
+                                  ? `Q${(period as any).quarter || (String(period.id).match(/Q([1-4])/)?.[1] || '?')} ${period.year}`
+                                  : `${monthNames[(period.month || 1) - 1]} ${period.year}`}
                               </option>
                             ))}
                           </select>

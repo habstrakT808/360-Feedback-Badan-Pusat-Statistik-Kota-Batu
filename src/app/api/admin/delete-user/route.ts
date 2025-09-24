@@ -1,45 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-
-// Create admin client for server-side operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
     // Get the current admin user
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    // Check if current user is admin using service role (bypass RLS)
-    const { data: adminCheck, error: adminError } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .single();
-
-    if (adminError || adminCheck?.role !== 'admin') {
+    // Resolve admin via profile id from email
+    const prof = await prisma.profile.findUnique({ where: { email: session.user.email as string } })
+    const adminCheck = prof ? await prisma.userRole.findFirst({ where: { user_id: prof.id, role: 'admin' } }) : null
+    if (!adminCheck) {
       return NextResponse.json(
         { error: 'Admin access required' },
         { status: 403 }
@@ -57,13 +33,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user exists
-    const { data: userExists, error: userCheckError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, email')
-      .eq('id', userId)
-      .single();
+    const userExists = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true }
+    });
 
-    if (userCheckError || !userExists) {
+    if (!userExists) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -71,14 +46,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is admin (prevent admin from deleting admin)
-    const { data: targetUserRole, error: roleCheckError } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .eq('role', 'admin')
-      .single();
+    const targetUserRole = await prisma.userRole.findFirst({
+      where: {
+        user_id: userId,
+        role: 'admin'
+      }
+    });
 
-    if (!roleCheckError && targetUserRole) {
+    if (targetUserRole) {
       return NextResponse.json(
         { error: 'Cannot delete admin users' },
         { status: 403 }
@@ -88,150 +63,74 @@ export async function POST(request: NextRequest) {
     // Start transaction-like operations
     // Delete related data first (due to foreign key constraints)
     
-    // Delete assessment assignments where user is assessor or assessee
-    const { error: assignmentError } = await supabaseAdmin
-      .from('assessment_assignments')
-      .delete()
-      .or(`assessor_id.eq.${userId},assessee_id.eq.${userId}`);
+    try {
+      // Delete assessment assignments where user is assessor or assessee
+      await prisma.assessmentAssignment.deleteMany({
+        where: {
+          OR: [
+            { assessor_id: userId },
+            { assessee_id: userId }
+          ]
+        }
+      });
 
-    if (assignmentError) {
-      console.error('Error deleting assessment assignments:', assignmentError);
+      // Delete assessment history
+      await prisma.assessmentHistory.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // Delete notification preferences
+      await prisma.notificationPreference.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // Delete notifications
+      await prisma.notification.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // Delete reminder logs
+      await prisma.reminderLog.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // Delete employee pins where user is giver or receiver
+      await prisma.employeePin.deleteMany({
+        where: {
+          OR: [
+            { giver_id: userId },
+            { receiver_id: userId }
+          ]
+        }
+      });
+
+      // Delete weekly pin allowance
+      await prisma.weeklyPinAllowance.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // Delete monthly pin allowance
+      await prisma.monthlyPinAllowance.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // Delete user role
+      await prisma.userRole.deleteMany({
+        where: { user_id: userId }
+      });
+
+      // Finally, delete the user profile
+      await prisma.profile.delete({
+        where: { id: userId }
+      });
+
+    } catch (dbError) {
+      console.error('Error deleting user data:', dbError);
       return NextResponse.json(
-        { error: 'Failed to delete user assessment data' },
+        { error: 'Failed to delete user data' },
         { status: 500 }
       );
     }
-
-    // Delete assessment history
-    const { error: historyError } = await supabaseAdmin
-      .from('assessment_history')
-      .delete()
-      .eq('user_id', userId);
-
-    if (historyError) {
-      console.error('Error deleting assessment history:', historyError);
-      return NextResponse.json(
-        { error: 'Failed to delete user assessment history' },
-        { status: 500 }
-      );
-    }
-
-    // Delete notification preferences
-    const { error: notifPrefError } = await supabaseAdmin
-      .from('notification_preferences')
-      .delete()
-      .eq('user_id', userId);
-
-    if (notifPrefError) {
-      console.error('Error deleting notification preferences:', notifPrefError);
-      return NextResponse.json(
-        { error: 'Failed to delete user notification preferences' },
-        { status: 500 }
-      );
-    }
-
-    // Delete notifications
-    const { error: notifError } = await supabaseAdmin
-      .from('notifications')
-      .delete()
-      .eq('user_id', userId);
-
-    if (notifError) {
-      console.error('Error deleting notifications:', notifError);
-      return NextResponse.json(
-        { error: 'Failed to delete user notifications' },
-        { status: 500 }
-      );
-    }
-
-    // Delete reminder logs
-    const { error: reminderError } = await supabaseAdmin
-      .from('reminder_logs')
-      .delete()
-      .eq('user_id', userId);
-
-    if (reminderError) {
-      console.error('Error deleting reminder logs:', reminderError);
-      return NextResponse.json(
-        { error: 'Failed to delete user reminder data' },
-        { status: 500 }
-      );
-    }
-
-    // Delete employee pins where user is giver or receiver
-    const { error: pinError } = await supabaseAdmin
-      .from('employee_pins')
-      .delete()
-      .or(`giver_id.eq.${userId},receiver_id.eq.${userId}`);
-
-    if (pinError) {
-      console.error('Error deleting employee pins:', pinError);
-      return NextResponse.json(
-        { error: 'Failed to delete user pin data' },
-        { status: 500 }
-      );
-    }
-
-    // Delete weekly pin allowance
-    const { error: weeklyPinError } = await supabaseAdmin
-      .from('weekly_pin_allowance')
-      .delete()
-      .eq('user_id', userId);
-
-    if (weeklyPinError) {
-      console.error('Error deleting weekly pin allowance:', weeklyPinError);
-      return NextResponse.json(
-        { error: 'Failed to delete user weekly pin allowance' },
-        { status: 500 }
-      );
-    }
-
-    // Delete monthly pin allowance
-    const { error: monthlyPinError } = await supabaseAdmin
-      .from('monthly_pin_allowance')
-      .delete()
-      .eq('user_id', userId);
-
-    if (monthlyPinError) {
-      console.error('Error deleting monthly pin allowance:', monthlyPinError);
-      return NextResponse.json(
-        { error: 'Failed to delete user monthly pin allowance' },
-        { status: 500 }
-      );
-    }
-
-    // Delete user role
-    const { error: roleDeleteError } = await supabaseAdmin
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
-
-    if (roleDeleteError) {
-      console.error('Error deleting user role:', roleDeleteError);
-      return NextResponse.json(
-        { error: 'Failed to delete user role' },
-        { status: 500 }
-      );
-    }
-
-    // Finally, delete the user profile
-    const { error: profileDeleteError } = await supabaseAdmin
-      .from('profiles')
-      .delete()
-      .eq('id', userId);
-
-    if (profileDeleteError) {
-      console.error('Error deleting user profile:', profileDeleteError);
-      return NextResponse.json(
-        { error: 'Failed to delete user profile' },
-        { status: 500 }
-      );
-    }
-
-    // Delete the user from Supabase Auth (this requires admin privileges)
-    // Note: This might require server-side admin key or special handling
-    // For now, we'll just delete the profile data
-    // The user will still exist in auth but won't have access to the app
 
     return NextResponse.json({
       success: true,

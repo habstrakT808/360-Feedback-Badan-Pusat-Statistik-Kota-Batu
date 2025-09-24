@@ -1,45 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-
-// Create admin client for server-side operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
     // Get the current admin user
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const session = await getServerSession(authOptions);
     
-    if (authError || !user) {
+    if (!session?.user || !('id' in session.user)) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Check if current user is admin using service role (bypass RLS)
-    const { data: adminCheck, error: adminError } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .single();
+    // Check if current user is admin
+    const adminCheck = await prisma.userRole.findFirst({
+      where: {
+        user_id: session.user.id as string,
+        role: 'admin'
+      }
+    });
 
-    if (adminError || adminCheck?.role !== 'admin') {
+    if (!adminCheck) {
       return NextResponse.json(
         { error: 'Admin access required' },
         { status: 403 }
@@ -57,21 +41,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if any of the target users are admin (prevent admin from deleting admin)
-    const { data: targetUserRoles, error: roleCheckError } = await supabaseAdmin
-      .from('user_roles')
-      .select('user_id, role')
-      .in('user_id', userIds)
-      .eq('role', 'admin');
+    const targetUserRoles = await prisma.userRole.findMany({
+      where: {
+        user_id: { in: userIds },
+        role: 'admin'
+      },
+      select: {
+        user_id: true,
+        role: true
+      }
+    });
 
-    if (roleCheckError) {
-      console.error('Error checking user roles:', roleCheckError);
-      return NextResponse.json(
-        { error: 'Failed to check user roles' },
-        { status: 500 }
-      );
-    }
-
-    const adminUserIds = targetUserRoles?.map(u => u.user_id).filter(Boolean) || [];
+    const adminUserIds = targetUserRoles.map(u => u.user_id).filter(Boolean);
     if (adminUserIds.length > 0) {
       return NextResponse.json(
         { error: 'Cannot delete admin users' },
@@ -87,68 +68,64 @@ export async function POST(request: NextRequest) {
         // Delete related data first (due to foreign key constraints)
         
         // Delete assessment assignments where user is assessor or assessee
-        await supabaseAdmin
-          .from('assessment_assignments')
-          .delete()
-          .or(`assessor_id.eq.${userId},assessee_id.eq.${userId}`);
+        await prisma.assessmentAssignment.deleteMany({
+          where: {
+            OR: [
+              { assessor_id: userId },
+              { assessee_id: userId }
+            ]
+          }
+        });
 
         // Delete assessment history
-        await supabaseAdmin
-          .from('assessment_history')
-          .delete()
-          .eq('user_id', userId);
+        await prisma.assessmentHistory.deleteMany({
+          where: { user_id: userId }
+        });
 
         // Delete notification preferences
-        await supabaseAdmin
-          .from('notification_preferences')
-          .delete()
-          .eq('user_id', userId);
+        await prisma.notificationPreference.deleteMany({
+          where: { user_id: userId }
+        });
 
         // Delete notifications
-        await supabaseAdmin
-          .from('notifications')
-          .delete()
-          .eq('user_id', userId);
+        await prisma.notification.deleteMany({
+          where: { user_id: userId }
+        });
 
         // Delete reminder logs
-        await supabaseAdmin
-          .from('reminder_logs')
-          .delete()
-          .eq('user_id', userId);
+        await prisma.reminderLog.deleteMany({
+          where: { user_id: userId }
+        });
 
         // Delete employee pins where user is giver or receiver
-        await supabaseAdmin
-          .from('employee_pins')
-          .delete()
-          .or(`giver_id.eq.${userId},receiver_id.eq.${userId}`);
+        await prisma.employeePin.deleteMany({
+          where: {
+            OR: [
+              { giver_id: userId },
+              { receiver_id: userId }
+            ]
+          }
+        });
 
         // Delete weekly pin allowance
-        await supabaseAdmin
-          .from('weekly_pin_allowance')
-          .delete()
-          .eq('user_id', userId);
+        await prisma.weeklyPinAllowance.deleteMany({
+          where: { user_id: userId }
+        });
 
         // Delete monthly pin allowance
-        await supabaseAdmin
-          .from('monthly_pin_allowance')
-          .delete()
-          .eq('user_id', userId);
+        await prisma.monthlyPinAllowance.deleteMany({
+          where: { user_id: userId }
+        });
 
         // Delete user role
-        await supabaseAdmin
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userId);
+        await prisma.userRole.deleteMany({
+          where: { user_id: userId }
+        });
 
         // Finally, delete the user profile
-        const { error: profileDeleteError } = await supabaseAdmin
-          .from('profiles')
-          .delete()
-          .eq('id', userId);
-
-        if (profileDeleteError) {
-          throw new Error(`Failed to delete user profile: ${profileDeleteError.message}`);
-        }
+        await prisma.profile.delete({
+          where: { id: userId }
+        });
 
         results.push({ success: true, userId });
       } catch (error: any) {

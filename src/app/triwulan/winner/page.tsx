@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { TriwulanPeriodService } from "@/lib/triwulan-period-service";
 import { TriwulanService } from "@/lib/triwulan-service";
-import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
 import {
   Trophy,
@@ -54,14 +53,17 @@ export default function TriwulanWinnerPage() {
         setScores(sortedInit);
         const ids = (sc || []).map((s) => s.candidate_id);
         if (ids.length) {
-          const { data: profs } = await supabase
-            .from("profiles")
-            .select("id, full_name, department, position, avatar_url")
-            .in("id", ids);
-          if (profs) {
-            const map: Record<string, any> = {};
-            profs.forEach((pp) => (map[pp.id] = pp));
-            setProfilesMap(map);
+          try {
+            const res = await fetch(`/api/team/batch?ids=${encodeURIComponent(ids.join(','))}`, { cache: 'no-store' })
+            if (res.ok) {
+              const json = await res.json().catch(() => ({ profiles: [] }))
+              const profs = json.profiles || []
+              const map: Record<string, any> = {}
+              profs.forEach((pp: any) => (map[pp.id] = pp))
+              setProfilesMap(map)
+            }
+          } catch (error) {
+            console.error("Error loading profiles:", error)
           }
         }
 
@@ -69,12 +71,16 @@ export default function TriwulanWinnerPage() {
         setWinner(w);
 
         if (w?.winner_id) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("id, full_name, department, position, avatar_url")
-            .eq("id", w.winner_id)
-            .single();
-          if (data) setProfile(data);
+          try {
+            const res = await fetch(`/api/team/batch?ids=${encodeURIComponent(w.winner_id)}`, { cache: 'no-store' })
+            if (res.ok) {
+              const json = await res.json().catch(() => ({ profiles: [] }))
+              const data = (json.profiles || [])[0]
+              if (data) setProfile(data)
+            }
+          } catch (error) {
+            console.error("Error loading winner profile:", error)
+          }
         }
 
         const vs = await TriwulanService.getRatingsCompletionStatus(p.id);
@@ -102,14 +108,17 @@ export default function TriwulanWinnerPage() {
       setScores(sorted);
       const ids = (sc || []).map((s) => s.candidate_id);
       if (ids.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, full_name, department, position, avatar_url")
-          .in("id", ids);
-        if (profs) {
-          const map: Record<string, any> = {};
-          profs.forEach((pp) => (map[pp.id] = pp));
-          setProfilesMap(map);
+        try {
+          const res = await fetch(`/api/team/batch?ids=${encodeURIComponent(ids.join(','))}`, { cache: 'no-store' })
+          if (res.ok) {
+            const json = await res.json().catch(() => ({ profiles: [] }))
+            const profs = json.profiles || []
+            const map: Record<string, any> = {}
+            profs.forEach((pp: any) => (map[pp.id] = pp))
+            setProfilesMap(map)
+          }
+        } catch (error) {
+          console.error("Error loading profiles:", error)
         }
       }
       const vs = await TriwulanService.getRatingsCompletionStatus(

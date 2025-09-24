@@ -1,15 +1,67 @@
 // src/lib/notification-service.ts
-import { supabase } from './supabase'
-import type { Database } from './database.types'
+import { prisma } from './prisma'
 
-// Type definitions from database
-type NotificationRow = Database['public']['Tables']['notifications']['Row']
-type NotificationInsert = Database['public']['Tables']['notifications']['Insert']
-type NotificationUpdate = Database['public']['Tables']['notifications']['Update']
+// Type definitions from Prisma
+type NotificationRow = {
+  id: string
+  user_id: string
+  title: string
+  message: string
+  type: string
+  priority: string
+  is_read: boolean
+  action_url: string | null
+  action_label: string | null
+  metadata: any
+  expires_at: Date | null
+  created_at: Date
+  updated_at: Date
+}
 
-type NotificationPreferencesRow = Database['public']['Tables']['notification_preferences']['Row']
-type NotificationPreferencesInsert = Database['public']['Tables']['notification_preferences']['Insert']
-type NotificationPreferencesUpdate = Database['public']['Tables']['notification_preferences']['Update']
+type NotificationInsert = {
+  user_id: string
+  title: string
+  message: string
+  type: string
+  priority?: string
+  is_read?: boolean
+  action_url?: string | null
+  action_label?: string | null
+  metadata?: any
+  expires_at?: Date | null
+}
+type NotificationUpdate = Partial<NotificationInsert> & { id: string }
+
+type NotificationPreferencesRow = {
+  id: string
+  user_id: string
+  email_enabled: boolean
+  push_enabled: boolean
+  assessment_reminders: boolean
+  deadline_warnings: boolean
+  completion_notifications: boolean
+  system_notifications: boolean
+  reminder_frequency: string
+  quiet_hours_start: Date
+  quiet_hours_end: Date
+  created_at: Date
+  updated_at: Date
+}
+
+type NotificationPreferencesInsert = {
+  user_id: string
+  email_enabled?: boolean
+  push_enabled?: boolean
+  assessment_reminders?: boolean
+  deadline_warnings?: boolean
+  completion_notifications?: boolean
+  system_notifications?: boolean
+  reminder_frequency?: string
+  quiet_hours_start: Date
+  quiet_hours_end: Date
+}
+
+type NotificationPreferencesUpdate = Partial<NotificationPreferencesInsert> & { id: string }
 
 // Export interfaces that match database structure
 export interface Notification extends NotificationRow {}
@@ -35,14 +87,13 @@ export class NotificationService {
   // Get user notifications from database
   static async getUserNotifications(userId: string, limit = 50): Promise<Notification[]> {
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit)
+      if (typeof window !== 'undefined') return []
+      const data = await prisma.notification.findMany({
+        where: { user_id: userId },
+        orderBy: { created_at: 'desc' },
+        take: limit
+      })
 
-      if (error) throw error
       return data || []
     } catch (error) {
       console.error('Failed to get user notifications:', error)
@@ -53,13 +104,14 @@ export class NotificationService {
   // Get unread count
   static async getUnreadCount(userId: string): Promise<number> {
     try {
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('is_read', false)
+      if (typeof window !== 'undefined') return 0
+      const count = await prisma.notification.count({
+        where: {
+          user_id: userId,
+          is_read: false
+        }
+      })
 
-      if (error) throw error
       return count || 0
     } catch (error) {
       console.error('Failed to get unread count:', error)
@@ -70,12 +122,14 @@ export class NotificationService {
   // Mark notification as read
   static async markAsRead(notificationId: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true, updated_at: new Date().toISOString() })
-        .eq('id', notificationId)
-
-      if (error) throw error
+      if (typeof window !== 'undefined') return
+      await prisma.notification.update({
+        where: { id: notificationId },
+        data: { 
+          is_read: true, 
+          updated_at: new Date()
+        }
+      })
     } catch (error) {
       console.error('Failed to mark as read:', error)
       throw error
@@ -85,13 +139,17 @@ export class NotificationService {
   // Mark all as read
   static async markAllAsRead(userId: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ is_read: true, updated_at: new Date().toISOString() })
-        .eq('user_id', userId)
-        .eq('is_read', false)
-
-      if (error) throw error
+      if (typeof window !== 'undefined') return
+      await prisma.notification.updateMany({
+        where: { 
+          user_id: userId,
+          is_read: false
+        },
+        data: { 
+          is_read: true, 
+          updated_at: new Date()
+        }
+      })
     } catch (error) {
       console.error('Failed to mark all as read:', error)
       throw error
@@ -101,12 +159,10 @@ export class NotificationService {
   // Delete notification
   static async deleteNotification(notificationId: string): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId)
-
-      if (error) throw error
+      if (typeof window !== 'undefined') return
+      await prisma.notification.delete({
+        where: { id: notificationId }
+      })
     } catch (error) {
       console.error('Failed to delete notification:', error)
       throw error
@@ -116,13 +172,10 @@ export class NotificationService {
   // Create notification
   static async createNotification(notification: NotificationInsertType): Promise<Notification> {
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .insert([notification])
-        .select()
-        .single()
+      const data = await prisma.notification.create({
+        data: notification
+      })
 
-      if (error) throw error
       return data
     } catch (error) {
       console.error('Failed to create notification:', error)
@@ -175,28 +228,12 @@ export class NotificationService {
 
       console.log('Attempting to insert', validatedNotifications.length, 'notifications...')
 
-      const { data, error } = await supabase
-        .from('notifications')
-        .insert(validatedNotifications)
-        .select()
+      const data = await prisma.notification.createMany({
+        data: validatedNotifications
+      })
 
-      if (error) {
-        console.error('Supabase insert error:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        })
-        throw new Error(`Database insert failed: ${error.message} (Code: ${error.code})`)
-      }
-      
-      if (!data) {
-        console.error('No data returned from insert')
-        throw new Error('No data returned from database insert')
-      }
-
-      console.log('Successfully created', data.length, 'notifications')
-      return data
+      console.log('Successfully created', data.count || 0, 'notifications')
+      return [] // createMany doesn't return the created records
       
     } catch (error: any) {
       console.error('Failed to create bulk notifications:', {
@@ -368,17 +405,13 @@ export class NotificationService {
   // Get notification preferences
   static async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
     try {
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
-
-      if (error && error.code !== 'PGRST116') throw error
+      const data = await prisma.notificationPreference.findFirst({
+        where: { user_id: userId }
+      })
       
       if (!data) {
         // Create default preferences if none exist
-        const defaultPreferences: NotificationPreferencesInsert = {
+        const defaultPreferences = {
           user_id: userId,
           email_enabled: true,
           push_enabled: true,
@@ -387,17 +420,14 @@ export class NotificationService {
           completion_notifications: true,
           system_notifications: true,
           reminder_frequency: 'daily',
-          quiet_hours_start: '22:00',
-          quiet_hours_end: '08:00'
+          quiet_hours_start: new Date('1970-01-01T22:00:00Z'),
+          quiet_hours_end: new Date('1970-01-01T08:00:00Z')
         }
 
-        const { data: newPrefs, error: createError } = await supabase
-          .from('notification_preferences')
-          .insert([defaultPreferences])
-          .select()
-          .single()
+        const newPrefs = await prisma.notificationPreference.create({
+          data: defaultPreferences
+        })
 
-        if (createError) throw createError
         return newPrefs
       }
 
@@ -415,10 +445,10 @@ export class NotificationService {
         completion_notifications: true,
         system_notifications: true,
         reminder_frequency: 'daily',
-        quiet_hours_start: '22:00',
-        quiet_hours_end: '08:00',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        quiet_hours_start: new Date('1970-01-01T22:00:00Z'),
+        quiet_hours_end: new Date('1970-01-01T08:00:00Z'),
+        created_at: new Date(),
+        updated_at: new Date()
       }
     }
   }
@@ -429,17 +459,40 @@ export class NotificationService {
     preferences: Partial<NotificationPreferences>
   ): Promise<NotificationPreferences> {
     try {
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .upsert({
-          user_id: userId,
-          ...preferences,
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single()
+      // First try to find existing preferences
+      const existing = await prisma.notificationPreference.findFirst({
+        where: { user_id: userId }
+      })
 
-      if (error) throw error
+      let data
+      if (existing) {
+        // Update existing preferences
+        data = await prisma.notificationPreference.update({
+          where: { id: existing.id },
+          data: {
+            ...preferences,
+            updated_at: new Date()
+          }
+        })
+      } else {
+        // Create new preferences
+        data = await prisma.notificationPreference.create({
+          data: {
+            user_id: userId,
+            ...preferences,
+            email_enabled: true,
+            push_enabled: true,
+            assessment_reminders: true,
+            deadline_warnings: true,
+            completion_notifications: true,
+            system_notifications: true,
+            reminder_frequency: 'daily',
+            quiet_hours_start: new Date('1970-01-01T22:00:00Z'),
+            quiet_hours_end: new Date('1970-01-01T08:00:00Z')
+          }
+        })
+      }
+
       return data
     } catch (error) {
       console.error('Failed to update notification preferences:', error)
@@ -449,24 +502,11 @@ export class NotificationService {
 
   // Subscribe to real-time notifications
   static subscribeToNotifications(userId: string, callback: (notification: Notification) => void) {
-    const subscription = supabase
-      .channel('notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`
-        },
-        (payload) => {
-          callback(payload.new as Notification)
-        }
-      )
-      .subscribe()
-
+    // TODO: Implement real-time notifications with Prisma
+    // For now, return a no-op unsubscribe function
+    console.log('Real-time notifications not implemented with Prisma yet')
     return () => {
-      supabase.removeChannel(subscription)
+      // No-op unsubscribe function
     }
   }
 
@@ -508,13 +548,14 @@ export class NotificationService {
       const cutoffDate = new Date()
       cutoffDate.setDate(cutoffDate.getDate() - daysOld)
 
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('is_read', true)
-        .lt('created_at', cutoffDate.toISOString())
-
-      if (error) throw error
+      await prisma.notification.deleteMany({
+        where: {
+          is_read: true,
+          created_at: {
+            lt: cutoffDate
+          }
+        }
+      })
     } catch (error) {
       console.error('Failed to cleanup old notifications:', error)
     }
@@ -533,7 +574,7 @@ export class NotificationService {
         priority_distribution: this.calculatePriorityDistribution(notifications),
         response_time_average: this.calculateAverageResponseTime(notifications),
         engagement_rate: this.calculateEngagementRate(notifications),
-        last_activity: notifications.length > 0 ? notifications[0].created_at : null
+        last_activity: notifications.length > 0 ? notifications[0].created_at.toISOString() : null
       }
 
       return analytics

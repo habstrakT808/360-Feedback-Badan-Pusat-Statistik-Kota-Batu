@@ -1,5 +1,5 @@
 // src/lib/roles-service.ts
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
 import { env, parseIdList } from '@/lib/utils'
 
 export class RolesService {
@@ -16,19 +16,24 @@ export class RolesService {
       overrideSupervisors.add('678ad9e9-cc08-4101-b735-6d2e1feaab3a') // Herlina (supervisor)
     }
 
-    // Query roles table; if RLS blocks on client, it will just return empty and we still have overrides
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-
-    if (error) {
-      // Fall back to overrides only
+    // If running in the browser, avoid Prisma and return overrides only
+    if (typeof window !== 'undefined') {
       return { adminIds: Array.from(overrideAdmins), supervisorIds: Array.from(overrideSupervisors) }
     }
 
-    for (const row of data || []) {
-      if (row.role === 'admin' && row.user_id) overrideAdmins.add(row.user_id)
-      if (row.role === 'supervisor' && row.user_id) overrideSupervisors.add(row.user_id)
+    try {
+      // Query roles table
+      const roles = await prisma.userRole.findMany({
+        select: { user_id: true, role: true }
+      })
+
+      for (const row of roles) {
+        if (row.role === 'admin' && row.user_id) overrideAdmins.add(row.user_id)
+        if (row.role === 'supervisor' && row.user_id) overrideSupervisors.add(row.user_id)
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error)
+      // Fall back to overrides only
     }
 
     return { adminIds: Array.from(overrideAdmins), supervisorIds: Array.from(overrideSupervisors) }

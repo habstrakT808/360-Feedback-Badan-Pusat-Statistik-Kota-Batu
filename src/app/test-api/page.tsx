@@ -1,18 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 
 export default function TestApiPage() {
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
   const testApiEndpoint = async () => {
     setLoading(true);
     try {
-      // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("No active session");
         return;
@@ -23,7 +22,6 @@ export default function TestApiPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({ 
           userId: 'test-user-id',

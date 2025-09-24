@@ -1,5 +1,5 @@
 // src/lib/smart-notification-service-improved.ts
-import { supabase } from './supabase'
+import { prisma } from './prisma'
 import { NotificationService } from './notification-service'
 
 interface UserData {
@@ -16,19 +16,19 @@ export class SmartNotificationServiceImproved {
 
   // Generate notifications with better duplicate prevention
   static async generateSimpleNotifications(): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log('🚀 Starting improved notification generation...')
       
       // First, cleanup any recent duplicates
       await this.cleanupRecentDuplicatesSimple()
       
-      const { data: users, error: usersError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name')
+      const users = await prisma.profile.findMany({
+        orderBy: { full_name: 'asc' }
+      })
 
-      if (usersError || !users) {
-        console.error('Failed to fetch users:', usersError)
+      if (!users) {
+        console.error('Failed to fetch users')
         return
       }
 
@@ -53,6 +53,7 @@ export class SmartNotificationServiceImproved {
 
   // Improved notification generation with better duplicate checking
   private static async generateUserNotificationsImproved(user: UserData): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log(`📝 Processing: ${user.full_name}`)
       
@@ -60,13 +61,24 @@ export class SmartNotificationServiceImproved {
       const checkTime = new Date(Date.now() - this.DUPLICATE_CHECK_HOURS * 60 * 60 * 1000).toISOString()
 
       // Get existing notifications with more specific checking
-      const { data: existingNotifications } = await supabase
-        .from('notifications')
-        .select('title, type, created_at, message')
-        .eq('user_id', user.id)
-        .eq('type', 'system')
-        .gte('created_at', checkTime)
-        .order('created_at', { ascending: false })
+      const existingNotifications = await prisma.notification.findMany({
+        where: {
+          user_id: user.id,
+          type: 'system',
+          created_at: {
+            gte: new Date(checkTime)
+          }
+        },
+        select: {
+          title: true,
+          type: true,
+          created_at: true,
+          message: true
+        },
+        orderBy: {
+          created_at: 'desc'
+        }
+      })
 
       // Create a more specific key for duplicate detection
       const existingKeys = new Set(
@@ -160,23 +172,26 @@ export class SmartNotificationServiceImproved {
   ): Promise<any | null> {
     try {
       // Get current active period
-      const { data: period } = await supabase
-        .from('assessment_periods')
-        .select('*')
-        .eq('is_active', true)
-        .single()
+      const period = await prisma.assessmentPeriod.findFirst({
+        where: { is_active: true }
+      })
 
       if (!period) return null
 
       // Get user assignments
-      const { data: assignments } = await supabase
-        .from('assessment_assignments')
-        .select(`
-          *,
-          assessee:profiles!assessment_assignments_assessee_id_fkey(full_name)
-        `)
-        .eq('assessor_id', user.id)
-        .eq('period_id', period.id)
+      const assignments = await prisma.assessmentAssignment.findMany({
+        where: {
+          assessor_id: user.id,
+          period_id: period.id
+        },
+        include: {
+          assessee: {
+            select: {
+              full_name: true
+            }
+          }
+        }
+      })
 
       const assignmentList = assignments || []
       const pendingAssignments = assignmentList.filter(a => !a.is_completed)
@@ -241,15 +256,27 @@ export class SmartNotificationServiceImproved {
 
   // Clean up recent duplicates - simplified version
   private static async cleanupRecentDuplicatesSimple(): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log('🧹 Cleaning up recent duplicates...')
       
       // Get duplicates from last 24 hours
-      const { data: duplicates } = await supabase
-        .from('notifications')
-        .select('user_id, title, created_at, id')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false })
+      const duplicates = await prisma.notification.findMany({
+        where: {
+          created_at: {
+            gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          }
+        },
+        select: {
+          user_id: true,
+          title: true,
+          created_at: true,
+          id: true
+        },
+        orderBy: {
+          created_at: 'desc'
+        }
+      })
 
       if (!duplicates || duplicates.length === 0) return
 
@@ -281,10 +308,13 @@ export class SmartNotificationServiceImproved {
         const batchSize = 50
         for (let i = 0; i < idsToDelete.length; i += batchSize) {
           const batch = idsToDelete.slice(i, i + batchSize)
-          await supabase
-            .from('notifications')
-            .delete()
-            .in('id', batch)
+          await prisma.notification.deleteMany({
+            where: {
+              id: {
+                in: batch
+              }
+            }
+          })
           
           console.log(`Deleted batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(idsToDelete.length/batchSize)}`)
         }
@@ -298,16 +328,27 @@ export class SmartNotificationServiceImproved {
 
   // Public method for single user
   static async generateForUser(userId: string): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log(`🔍 Checking notifications for user ${userId}...`)
       
       // Check if user already has the 3 required notifications
-      const { data: existingNotifications } = await supabase
-        .from('notifications')
-        .select('id, title, type, created_at, metadata')
-        .eq('user_id', userId)
-        .eq('type', 'system')
-        .order('created_at', { ascending: false })
+      const existingNotifications = await prisma.notification.findMany({
+        where: {
+          user_id: userId,
+          type: 'system'
+        },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          created_at: true,
+          metadata: true
+        },
+        orderBy: {
+          created_at: 'desc'
+        }
+      })
 
       if (existingNotifications && existingNotifications.length >= 3) {
         // Check if user has all 3 types of notifications
@@ -333,11 +374,9 @@ export class SmartNotificationServiceImproved {
       // Clean up any existing duplicates for this user first
       await this.cleanupUserDuplicates(userId)
 
-      const { data: user } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      const user = await prisma.profile.findUnique({
+        where: { id: userId }
+      })
 
       if (user) {
         await this.generateUserNotificationsImproved(user)
@@ -349,16 +388,27 @@ export class SmartNotificationServiceImproved {
 
   // Clean up duplicates for specific user
   private static async cleanupUserDuplicates(userId: string): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log(`🧹 Cleaning up duplicates for user ${userId}...`)
       
       // Get all notifications for this user
-      const { data: userNotifications } = await supabase
-        .from('notifications')
-        .select('id, title, message, created_at, metadata')
-        .eq('user_id', userId)
-        .eq('type', 'system')
-        .order('created_at', { ascending: false })
+      const userNotifications = await prisma.notification.findMany({
+        where: {
+          user_id: userId,
+          type: 'system'
+        },
+        select: {
+          id: true,
+          title: true,
+          message: true,
+          created_at: true,
+          metadata: true
+        },
+        orderBy: {
+          created_at: 'desc'
+        }
+      })
 
       if (!userNotifications || userNotifications.length === 0) return
 
@@ -403,10 +453,13 @@ export class SmartNotificationServiceImproved {
         const batchSize = 50
         for (let i = 0; i < idsToDelete.length; i += batchSize) {
           const batch = idsToDelete.slice(i, i + batchSize)
-          await supabase
-            .from('notifications')
-            .delete()
-            .in('id', batch)
+          await prisma.notification.deleteMany({
+            where: {
+              id: {
+                in: batch
+              }
+            }
+          })
         }
 
         console.log(`✅ Removed ${idsToDelete.length} duplicate notifications for user ${userId}`)
@@ -418,6 +471,7 @@ export class SmartNotificationServiceImproved {
 
   // Remove all duplicates
   static async removeDuplicates(): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log('🧹 Removing all duplicate notifications...')
       
@@ -425,11 +479,14 @@ export class SmartNotificationServiceImproved {
       const thirtyDaysAgo = new Date()
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-      await supabase
-        .from('notifications')
-        .delete()
-        .eq('is_read', true)
-        .lt('created_at', thirtyDaysAgo.toISOString())
+      await prisma.notification.deleteMany({
+        where: {
+          is_read: true,
+          created_at: {
+            lt: thirtyDaysAgo
+          }
+        }
+      })
 
       // Clean up recent duplicates
       await this.cleanupRecentDuplicatesSimple()
@@ -442,15 +499,14 @@ export class SmartNotificationServiceImproved {
 
   // Daily reminder - simplified
   static async sendDailyReminders(): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log('🔔 Sending daily reminders...')
       
       // Get current active period
-      const { data: period } = await supabase
-        .from('assessment_periods')
-        .select('*')
-        .eq('is_active', true)
-        .single()
+      const period = await prisma.assessmentPeriod.findFirst({
+        where: { is_active: true }
+      })
 
       if (!period) {
         console.log('No active period for daily reminders')
@@ -469,14 +525,20 @@ export class SmartNotificationServiceImproved {
       }
 
       // Get users with pending assignments
-      const { data: pendingData } = await supabase
-        .from('assessment_assignments')
-        .select(`
-          assessor_id,
-          assessor:profiles!assessment_assignments_assessor_id_fkey(full_name)
-        `)
-        .eq('period_id', period.id)
-        .eq('is_completed', false)
+      const pendingData = await prisma.assessmentAssignment.findMany({
+        where: {
+          period_id: period.id,
+          is_completed: false
+        },
+        select: {
+          assessor_id: true,
+          assessor: {
+            select: {
+              full_name: true
+            }
+          }
+        }
+      })
 
       if (!pendingData) return
 
@@ -523,25 +585,25 @@ export class SmartNotificationServiceImproved {
 
   // Comprehensive daily reminder system
   static async sendComprehensiveDailyReminders(): Promise<void> {
+    if (typeof window !== 'undefined') return
     try {
       console.log('🔔 Sending comprehensive daily reminders...')
       
       // Get all users (excluding admins)
-      const { data: users, error: usersError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name')
+      const users = await prisma.profile.findMany({
+        orderBy: { full_name: 'asc' }
+      })
 
-      if (usersError || !users) {
-        console.error('Failed to fetch users:', usersError)
+      if (!users) {
+        console.error('Failed to fetch users')
         return
       }
 
       // Get admin IDs to exclude
-      const { data: adminUsers } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'admin')
+      const adminUsers = await prisma.userRole.findMany({
+        where: { role: 'admin' },
+        select: { user_id: true }
+      })
 
       const adminIds = adminUsers?.map(u => u.user_id) || []
       const regularUsers = users.filter(user => !adminIds.includes(user.id))
@@ -565,6 +627,7 @@ export class SmartNotificationServiceImproved {
 
   // Send daily reminders for a specific user
   private static async sendUserDailyReminders(user: any): Promise<void> {
+    if (typeof window !== 'undefined') return
     const firstName = user.full_name.split(' ')[0]
     const reminders: any[] = []
 
@@ -598,42 +661,57 @@ export class SmartNotificationServiceImproved {
 
   // Check if reminder was already sent today
   private static async wasReminderSentToday(userId: string, reminderType: string): Promise<boolean> {
+    if (typeof window !== 'undefined') return false
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
-    const { data: existingReminders } = await supabase
-      .from('notifications')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('type', 'reminder')
-      .gte('created_at', today.toISOString())
-      .eq('metadata->notification_type', reminderType)
+    const existingReminders = await prisma.notification.findMany({
+      where: {
+        user_id: userId,
+        type: 'reminder',
+        created_at: {
+          gte: today
+        },
+        metadata: {
+          path: ['notification_type'],
+          equals: reminderType
+        }
+      },
+      select: {
+        id: true
+      }
+    })
 
     return (existingReminders?.length || 0) > 0
   }
 
   // Check 360° Assessment reminders
   private static async checkAssessmentReminders(userId: string): Promise<any | null> {
+    if (typeof window !== 'undefined') return null
     try {
       // Get active period
-      const { data: period } = await supabase
-        .from('assessment_periods')
-        .select('*')
-        .eq('is_active', true)
-        .single()
+      const period = await prisma.assessmentPeriod.findFirst({
+        where: { is_active: true }
+      })
 
       if (!period) return null
 
       // Get pending assignments for this user
-      const { data: pendingAssignments } = await supabase
-        .from('assessment_assignments')
-        .select(`
-          id,
-          assessee:profiles!assessment_assignments_assessee_id_fkey(full_name)
-        `)
-        .eq('assessor_id', userId)
-        .eq('period_id', period.id)
-        .eq('is_completed', false)
+      const pendingAssignments = await prisma.assessmentAssignment.findMany({
+        where: {
+          assessor_id: userId,
+          period_id: period.id,
+          is_completed: false
+        },
+        select: {
+          id: true,
+          assessee: {
+            select: {
+              full_name: true
+            }
+          }
+        }
+      })
 
       if (!pendingAssignments || pendingAssignments.length === 0) return null
 
@@ -670,25 +748,30 @@ export class SmartNotificationServiceImproved {
 
   // Check Pin System reminders
   private static async checkPinSystemReminders(userId: string): Promise<any | null> {
+    if (typeof window !== 'undefined') return null
     try {
       // Get active pin period
-      const { data: pinPeriod } = await supabase
-        .from('pin_periods')
-        .select('*')
-        .eq('is_active', true)
-        .single()
+      const pinPeriod = await prisma.pinPeriod.findFirst({
+        where: { is_active: true }
+      })
 
       if (!pinPeriod) return null
 
       // Check if user has already submitted pins this period
       // Pin system uses `employee_pins` without explicit period linkage.
       // Infer period by date range from active `pin_periods`.
-      const { data: existingPins } = await supabase
-        .from('employee_pins')
-        .select('id')
-        .eq('giver_id', userId)
-        .gte('given_at', pinPeriod.start_date)
-        .lte('given_at', pinPeriod.end_date)
+      const existingPins = await prisma.employeePin.findMany({
+        where: {
+          giver_id: userId,
+          given_at: {
+            gte: new Date(pinPeriod.start_date),
+            lte: new Date(pinPeriod.end_date)
+          }
+        },
+        select: {
+          id: true
+        }
+      })
 
       if (existingPins && existingPins.length > 0) return null
 
@@ -722,49 +805,9 @@ export class SmartNotificationServiceImproved {
   // Check Triwulan reminders
   private static async checkTriwulanReminders(userId: string): Promise<any | null> {
     try {
-      // Get active triwulan period
-      // Get active triwulan period
-      const { data: triwulanPeriod } = await supabase
-        .from('triwulan_periods')
-        .select('*')
-        .eq('is_active', true)
-        .single()
-
-      if (!triwulanPeriod) return null
-
-      // Check if user has already submitted triwulan this period
-      // Consider user done if has completed triwulan vote for active period
-      const { data: voteDone } = await supabase
-        .from('triwulan_vote_completion')
-        .select('completed')
-        .eq('period_id', triwulanPeriod.id)
-        .eq('voter_id', userId)
-        .eq('completed', true)
-        .maybeSingle()
-
-      if (voteDone && voteDone.completed === true) return null
-
-      // Calculate days left
-      const daysLeft = Math.ceil(
-        (new Date(triwulanPeriod.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-      )
-
-      // Only send reminder if deadline is approaching
-      if (daysLeft > 7) return null
-
-      return {
-        user_id: userId,
-        title: `📊 Pengingat: Penilaian Triwulan Menunggu`,
-        message: `Anda belum mengisi penilaian triwulan untuk periode ini.${daysLeft <= 3 ? ` Deadline: ${daysLeft} hari lagi!` : ` Tersisa ${daysLeft} hari.`}`,
-        type: 'reminder',
-        priority: daysLeft <= 3 ? 'high' : 'medium',
-        action_url: '/triwulan',
-        metadata: {
-          notification_type: 'daily_reminder_triwulan',
-          period_id: triwulanPeriod.id,
-          days_left: daysLeft
-        }
-      }
+      // TODO: Implement triwulan reminders when triwulan model is available
+      // For now, return null to skip triwulan reminders
+      return null
     } catch (error) {
       console.error('Error checking triwulan reminders:', error)
       return null

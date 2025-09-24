@@ -1,43 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
-import { supabase } from '@/lib/supabase';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
   try {
     const { newEmail } = await request.json();
 
-    // Get the current user
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    // Get the current user session
+    const session = await getServerSession(authOptions);
+    if (!session?.user || !('id' in session.user)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const userId = session.user.id as string;
 
-    // Update email using admin client
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-      email: newEmail,
-      email_confirm: true // Automatically confirm the email
+    // Update email in users table
+    await prisma.user.update({
+      where: { id: userId },
+      data: { email: newEmail }
     });
 
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 400 });
-    }
-
     // Also update the profiles table
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({ email: newEmail })
-      .eq('id', user.id);
-
-    if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 400 });
-    }
+    await prisma.profile.update({
+      where: { id: userId },
+      data: { email: newEmail }
+    });
 
     return NextResponse.json({ 
       success: true, 

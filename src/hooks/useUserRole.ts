@@ -1,49 +1,29 @@
 // src/hooks/useUserRole.ts
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useUser } from '@/store/useStore'
+import { useSession } from 'next-auth/react'
 
 export function useUserRole() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isSupervisor, setIsSupervisor] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const user = useUser()
+  const { data: session } = useSession()
 
   useEffect(() => {
     const checkUserRole = async () => {
-      if (!user?.id) {
+      const userId = (session?.user && 'id' in session.user ? session.user.id : null) || user?.id
+      if (!userId) {
         setIsLoading(false)
         return
       }
 
       try {
-        console.log('🔍 Checking role for user:', user.id)
-        
-        // First try to get role from user_roles table
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle() // Use maybeSingle instead of single to avoid error if no record
-
-        console.log('🔍 Role check result:', { data, error })
-
-        if (error) {
-          console.error('Role check error:', error)
-          // Fallback to environment variables and hardcoded IDs
-          const { adminIds, supervisorIds } = await import('@/lib/roles-service').then(m => m.RolesService.getRoleUserIds())
-          
-          console.log('🔍 Environment role check:', { adminIds, supervisorIds, userId: user.id })
-          
-          setIsAdmin(adminIds.includes(user.id))
-          setIsSupervisor(supervisorIds.includes(user.id))
-        } else {
-          // If we got data from user_roles table
-          const role = data?.role || 'user'
-          console.log('🔍 Table role result:', role)
-          setIsAdmin(role === 'admin')
-          setIsSupervisor(role === 'supervisor')
-        }
+        const res = await fetch('/api/me/role', { cache: 'no-store' })
+        const json = await res.json()
+        const role = json.role || 'user'
+        setIsAdmin(role === 'admin')
+        setIsSupervisor(role === 'supervisor')
       } catch (error) {
         console.error('Role check exception:', error)
         setIsAdmin(false)
@@ -54,7 +34,7 @@ export function useUserRole() {
     }
 
     checkUserRole()
-  }, [user?.id])
+  }, [session?.user, user?.id])
 
   return { isAdmin, isSupervisor, isLoading }
 }

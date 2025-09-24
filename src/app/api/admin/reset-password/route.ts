@@ -1,67 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-
-// Create admin client for server-side operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
-  }
-});
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
   try {
-    // Debug: Log environment variables
-    console.log('Reset Password - Environment check:', {
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Set' : 'Not set',
-      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Set' : 'Not set'
-    });
-
-    const { userId } = await request.json();
-
-    // Get the current admin user
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Resolve current user's profile.id via email, then check role by profile id
+    const prof = await prisma.profile.findUnique({ where: { email: session.user.email } });
+    const isAdmin = prof
+      ? await prisma.userRole.findFirst({ where: { user_id: prof.id, role: 'admin' } })
+      : null;
 
-    // Check if current user is admin using service role (bypass RLS)
-    console.log('Reset Password - Checking admin role for user:', user.id);
-    
-    const { data: userRole, error: roleError } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
-
-    console.log('Reset Password - Role check result:', { userRole, roleError });
-
-    if (roleError || userRole?.role !== 'admin') {
-      console.log('Reset Password - Admin access denied for user:', user.id);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    console.log('Reset Password - Admin access granted for user:', user.id);
+    const { userId, email } = await request.json();
 
-    // Reset password to default: 12345678
-    const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      password: '12345678'
-    });
-
-    if (passwordError) {
-      return NextResponse.json({ error: passwordError.message }, { status: 400 });
+    // Resolve target user
+    let targetUser: { id: string } | null = null;
+    let resolvedEmail: string | null = null;
+    if (email) {
+      resolvedEmail = email;
+      targetUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
     }
+    if (!targetUser && userId) {
+      // try as user.id first
+      targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+      if (!targetUser) {
+        // maybe body carried profile.id; resolve profile -> email -> user
+        const prof2 = await prisma.profile.findUnique({ where: { id: userId } });
+        if (prof2?.email) {
+          resolvedEmail = prof2.email;
+          targetUser = await prisma.user.findUnique({ where: { email: prof2.email }, select: { id: true } });
+        }
+      }
+    }
+    // Hash the new password (do once; may be used for create or update)
+    const hashedPassword = await bcrypt.hash('12345678', 12);
+
+    // If user still not found but we have an email, create or upsert the User
+    if (!targetUser && resolvedEmail) {
+      const upserted = await prisma.user.upsert({
+        where: { email: resolvedEmail },
+        update: { password_hash: hashedPassword },
+        create: { email: resolvedEmail, password_hash: hashedPassword },
+        select: { id: true },
+      });
+      return NextResponse.json({ 
+        success: true,
+        message: 'Password di-set untuk akun baru (atau diperbarui) ke 12345678',
+        userId: upserted.id,
+      });
+    }
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Update user password in database
+    await prisma.user.update({
+      where: { id: targetUser.id },
+      data: { password_hash: hashedPassword }
+    });
 
     return NextResponse.json({ 
       success: true, 

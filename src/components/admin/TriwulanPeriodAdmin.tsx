@@ -5,10 +5,12 @@ import { motion } from "framer-motion";
 import { Calendar, Plus, Edit, Trash2, Save } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { TriwulanPeriodService } from "@/lib/triwulan-period-service";
-import { supabase } from "@/lib/supabase";
 import { RolesService } from "@/lib/roles-service";
+// Removed Prisma import in client component
+import { useSession } from "next-auth/react";
 
 export function TriwulanPeriodAdmin() {
+  const { data: session } = useSession();
   const [periods, setPeriods] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -140,12 +142,10 @@ export function TriwulanPeriodAdmin() {
   const loadDeficiencies = async (periodId: string) => {
     setSelectedPeriodId(periodId);
     try {
-      // load users then exclude any admin/supervisor (including env overrides)
-      const { data: users, error: uerr } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .order("full_name", { ascending: true });
-      if (uerr) throw uerr;
+      // load users via API to avoid Prisma in browser
+      const resUsers = await fetch('/api/admin/users', { cache: 'no-store' });
+      const jsonUsers = await resUsers.json().catch(() => ({ users: [] }));
+      const users = Array.isArray(jsonUsers.users) ? jsonUsers.users.map((u: any) => ({ id: u.id, full_name: u.full_name })) : [];
 
       const { adminIds, supervisorIds } = await RolesService.getRoleUserIds();
       const restricted = new Set([
@@ -177,7 +177,7 @@ export function TriwulanPeriodAdmin() {
         year: number;
         deficiency_hours: number;
       }> = [];
-      (filteredUsers || []).forEach((u) => {
+      (filteredUsers || []).forEach((u: any) => {
         months.forEach((m) => {
           const found = existing.find(
             (e) =>
@@ -202,8 +202,7 @@ export function TriwulanPeriodAdmin() {
   const saveDeficiencies = async () => {
     if (!selectedPeriodId) return;
     try {
-      const session = await supabase.auth.getUser();
-      const filledBy = (session.data.user?.id as string) || null;
+      const filledBy = session?.user && 'id' in session.user ? session.user.id as string : null;
       const payload = defRows.map((r) => ({
         period_id: selectedPeriodId,
         user_id: r.user_id,

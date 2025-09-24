@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id                String   @id @default(uuid()) @map("id") @db.Uuid
+  email             String   @unique
+  username          String   @unique
+  full_name         String
+  position          String?
+  department        String?
+  avatar_url        String?
+  allow_public_view Boolean  @default(false)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  assignmentsAsAssessor AssessmentAssignment[] @relation("assessor")
+  assignmentsAsAssessee AssessmentAssignment[] @relation("assessee")
+  reminderLogs          ReminderLog[]
+  assessmentHistory     AssessmentHistory[]
+  employeePinsGiven     EmployeePin[]          @relation("pin_giver")
+  employeePinsReceived  EmployeePin[]          @relation("pin_receiver")
+
+  weeklyPinAllowances    WeeklyPinAllowance[] // Tambahkan baris ini
+  userRole               UserRole?
+  MonthlyPinAllowance    MonthlyPinAllowance[]
+  NotificationPreference NotificationPreference[]
+  Notification           Notification[]
+
+  @@map("profiles")
+}
+
+model AssessmentPeriod {
+  id           String    @id @default(uuid()) @db.Uuid
+  month        Int
+  year         Int
+  start_date   DateTime  @db.Date
+  end_date     DateTime  @db.Date
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  completed_at DateTime?
+  is_completed Boolean   @default(false)
+
+  assignments       AssessmentAssignment[]
+  reminderLogs      ReminderLog[]
+  assessmentHistory AssessmentHistory[]
+
+  @@unique([month, year], name: "unique_period")
+  @@map("assessment_periods")
+}
+
+model AssessmentAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  period_id    String    @db.Uuid
+  assessor_id  String    @db.Uuid
+  assessee_id  String    @db.Uuid
+  is_completed Boolean   @default(false)
+  completed_at DateTime?
+  created_at   DateTime  @default(now())
+
+  period    AssessmentPeriod   @relation(fields: [period_id], references: [id])
+  assessor  Profile            @relation("assessor", fields: [assessor_id], references: [id])
+  assessee  Profile            @relation("assessee", fields: [assessee_id], references: [id])
+  feedbacks FeedbackResponse[]
+
+  @@unique([period_id, assessor_id, assessee_id], name: "unique_assignment")
+  @@index([period_id], name: "idx_assessment_assignments_period")
+  @@index([assessor_id], name: "idx_assessment_assignments_assessor")
+  @@index([assessee_id], name: "idx_assessment_assignments_assessee")
+  @@map("assessment_assignments")
+}
+
+model FeedbackResponse {
+  id            String   @id @default(uuid()) @db.Uuid
+  assignment_id String   @db.Uuid
+  aspect        String
+  indicator     String
+  rating        Int
+  comment       String?
+  created_at    DateTime @default(now())
+
+  assignment AssessmentAssignment @relation(fields: [assignment_id], references: [id])
+
+  @@index([assignment_id], name: "idx_feedback_responses_assignment")
+  @@map("feedback_responses")
+}
+
+model ReminderLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String   @db.Uuid
+  period_id     String   @db.Uuid
+  reminder_type String
+  sent_at       DateTime @default(now())
+
+  user   Profile          @relation(fields: [user_id], references: [id])
+  period AssessmentPeriod @relation(fields: [period_id], references: [id])
+
+  @@index([user_id, period_id], name: "idx_reminder_logs_user_period")
+  @@map("reminder_logs")
+}
+
+model AssessmentHistory {
+  id                      String   @id @default(uuid()) @db.Uuid
+  user_id                 String   @db.Uuid
+  period_id               String   @db.Uuid
+  total_feedback_received Int      @default(0)
+  average_rating          Decimal? @db.Decimal(3, 2)
+  created_at              DateTime @default(now())
+
+  user   Profile          @relation(fields: [user_id], references: [id])
+  period AssessmentPeriod @relation(fields: [period_id], references: [id])
+
+  @@unique([user_id, period_id], name: "unique_user_period")
+  @@map("assessment_history")
+}
+
+model EmployeePin {
+  id          String   @id @default(uuid()) @db.Uuid
+  giver_id    String?  @db.Uuid
+  receiver_id String?  @db.Uuid
+  given_at    DateTime @default(now())
+  week_number Int
+  year        Int
+  month       Int
+  created_at  DateTime @default(now())
+
+  giver    Profile? @relation("pin_giver", fields: [giver_id], references: [id])
+  receiver Profile? @relation("pin_receiver", fields: [receiver_id], references: [id])
+
+  @@index([week_number, year], name: "idx_employee_pins_week_year")
+  @@index([month, year], name: "idx_employee_pins_month_year")
+  @@index([giver_id], name: "idx_employee_pins_giver")
+  @@index([receiver_id], name: "idx_employee_pins_receiver")
+  @@map("employee_pins")
+}
+
+model WeeklyPinAllowance {
+  id             String   @id @default(uuid()) @db.Uuid
+  user_id        String?  @db.Uuid
+  week_number    Int
+  year           Int
+  pins_remaining Int      @default(4)
+  pins_used      Int      @default(0)
+  created_at     DateTime @default(now())
+
+  user Profile? @relation(fields: [user_id], references: [id])
+
+  @@unique([user_id, week_number, year], name: "weekly_pin_allowance_user_week_year_key")
+  @@index([user_id, week_number, year], name: "idx_weekly_pin_allowance_user_week_year")
+  @@map("weekly_pin_allowance")
+}
+
+model PinPeriod {
+  id           String   @id @default(uuid()) @db.Uuid
+  month        Int?
+  year         Int?
+  start_date   DateTime @db.Date
+  end_date     DateTime @db.Date
+  is_active    Boolean  @default(false)
+  is_completed Boolean  @default(false)
+  created_at   DateTime @default(now())
+
+  @@map("pin_periods")
+}
+
+model MonthlyPinAllowance {
+  id             String   @id @default(uuid()) @db.Uuid
+  user_id        String?  @db.Uuid
+  month          Int
+  year           Int
+  pins_remaining Int      @default(4)
+  pins_used      Int      @default(0)
+  created_at     DateTime @default(now())
+
+  user Profile? @relation(fields: [user_id], references: [id])
+
+  @@map("monthly_pin_allowance")
+}
+
+model NotificationPreference {
+  id                       String   @id @default(uuid()) @db.Uuid
+  user_id                  String   @db.Uuid
+  email_enabled            Boolean  @default(true)
+  push_enabled             Boolean  @default(true)
+  assessment_reminders     Boolean  @default(true)
+  deadline_warnings        Boolean  @default(true)
+  completion_notifications Boolean  @default(true)
+  system_notifications     Boolean  @default(true)
+  reminder_frequency       String   @default("weekly")
+  quiet_hours_start        DateTime @db.Time
+  quiet_hours_end          DateTime @db.Time
+  created_at               DateTime @default(now())
+  updated_at               DateTime @default(now())
+
+  user Profile @relation(fields: [user_id], references: [id])
+
+  @@map("notification_preferences")
+}
+
+model Notification {
+  id           String    @id @default(uuid()) @db.Uuid
+  user_id      String    @db.Uuid
+  title        String
+  message      String    @db.Text
+  type         String
+  priority     String    @default("medium")
+  is_read      Boolean   @default(false)
+  action_url   String?
+  action_label String?
+  metadata     Json?
+  expires_at   DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
+
+  user Profile @relation(fields: [user_id], references: [id])
+
+  @@map("notifications")
+}
+
+/**
+ * NextAuth models (standar)
+ * Nanti kita hubungkan `User.email` dengan `Profile.email` di logic aplikasi.
+ */
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String?
+  email         String?   @unique
+  password_hash String?
+  emailVerified DateTime?
+  image         String?
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model UserRole {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String?  @unique @db.Uuid
+  role       String   @default("user")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  user Profile? @relation(fields: [user_id], references: [id])
+
+  @@map("user_roles")
+}

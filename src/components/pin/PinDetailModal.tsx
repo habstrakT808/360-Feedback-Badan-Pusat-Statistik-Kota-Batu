@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Pin, Users, Calendar, Award, Star } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+// Removed Prisma import; use API instead
 
 interface PinDetailModalProps {
   isOpen: boolean;
@@ -26,7 +26,7 @@ interface PinGiver {
   giver_id: string;
   giver_name: string;
   giver_avatar?: string | null;
-  created_at: string;
+  given_at: string;
 }
 
 export function PinDetailModal({
@@ -60,13 +60,10 @@ export function PinDetailModal({
       const month = periodInfo.month;
       const year = periodInfo.year;
 
-      // Cari rentang tanggal dari pin_periods; jika tidak ada, fallback ke filter month/year langsung
-      const { data: periodForMonth } = await (supabase as any)
-        .from("pin_periods")
-        .select("start_date, end_date")
-        .eq("month", month || 1)
-        .eq("year", year)
-        .single();
+      // Ambil pin period via API admin/pin-periods
+      const resPeriod = await fetch('/api/admin/pin-periods', { cache: 'no-store' });
+      const jsonPeriod = await resPeriod.json().catch(() => ({ data: [] }));
+      const periodForMonth = Array.isArray(jsonPeriod.data) ? jsonPeriod.data.find((p: any) => p.year === year && p.month === (month || 1)) : null;
 
       let pins: any[] | null = null;
       let pinsError: any = null;
@@ -77,32 +74,22 @@ export function PinDetailModal({
         periodForMonth.end_date
       ) {
         // Filter menggunakan rentang tanggal periode untuk menangkap pin yang masih dihitung ke periode ini
-        const { data, error } = await supabase
-          .from("employee_pins")
-          .select(
-            `giver_id, receiver_id, week_number, year, month, created_at,
-             giver:profiles!employee_pins_giver_id_fkey(id, full_name, avatar_url)`
-          )
-          .eq("receiver_id", user.user_id)
-          .gte("created_at", periodForMonth.start_date)
-          .lte("created_at", periodForMonth.end_date)
-          .order("created_at", { ascending: false });
-        pins = data as any[];
-        pinsError = error;
+        const qs = new URLSearchParams();
+        qs.set('receiverId', user.user_id);
+        qs.set('start', new Date(periodForMonth.start_date).toISOString());
+        qs.set('end', new Date(periodForMonth.end_date).toISOString());
+        const resPins = await fetch(`/api/pins/history?${qs.toString()}`, { cache: 'no-store' });
+        const jsonPins = await resPins.json().catch(() => ({ pins: [] }));
+        pins = Array.isArray(jsonPins.pins) ? jsonPins.pins : [];
       } else {
         // Fallback: gunakan filter month/year langsung
-        const { data, error } = await supabase
-          .from("employee_pins")
-          .select(
-            `giver_id, receiver_id, week_number, year, month, created_at,
-             giver:profiles!employee_pins_giver_id_fkey(id, full_name, avatar_url)`
-          )
-          .eq("receiver_id", user.user_id)
-          .eq("month", month || 1)
-          .eq("year", year)
-          .order("created_at", { ascending: false });
-        pins = data as any[];
-        pinsError = error;
+        const qs = new URLSearchParams();
+        qs.set('receiverId', user.user_id);
+        qs.set('month', String(month || 1));
+        qs.set('year', String(year));
+        const resPins = await fetch(`/api/pins/history?${qs.toString()}`, { cache: 'no-store' });
+        const jsonPins = await resPins.json().catch(() => ({ pins: [] }));
+        pins = Array.isArray(jsonPins.pins) ? jsonPins.pins : [];
       }
 
       console.log("🔍 All pins for receiver:", { pins, pinsError });
@@ -121,9 +108,9 @@ export function PinDetailModal({
       // Mapping langsung menggunakan join profile yang sudah diambil
       const givers = (pins as any[]).map((pin) => ({
         giver_id: pin.giver_id,
-        giver_name: pin.giver?.full_name || "Unknown",
-        giver_avatar: pin.giver?.avatar_url || null,
-        created_at: pin.created_at,
+        giver_name: pin.giver?.full_name || pin.giver_name || "Unknown",
+        giver_avatar: pin.giver?.avatar_url || pin.giver_avatar || null,
+        given_at: pin.given_at,
       }));
 
       // Debug: log processed givers
@@ -319,7 +306,7 @@ export function PinDetailModal({
                             {giver.giver_name}
                           </h5>
                           <p className="text-sm text-gray-500">
-                            {formatDate(giver.created_at)}
+                            {formatDate(giver.given_at)}
                           </p>
                         </div>
 

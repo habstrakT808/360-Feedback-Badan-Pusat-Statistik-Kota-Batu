@@ -1,22 +1,40 @@
 // src/app/api/cleanup-duplicates/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !('id' in session.user)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check if current user is admin
+    const role = await prisma.userRole.findFirst({ 
+      where: { user_id: session.user.id as string } 
+    })
+
+    if (role?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+
     console.log('🧹 Starting duplicate notification cleanup...')
     
     // Get all system notifications
-    const { data: allNotifications, error: fetchError } = await supabaseAdmin
-      .from('notifications')
-      .select('id, user_id, title, message, created_at, metadata')
-      .eq('type', 'system')
-      .order('created_at', { ascending: false })
-
-    if (fetchError) {
-      console.error('Error fetching notifications:', fetchError)
-      return NextResponse.json({ success: false, error: fetchError.message }, { status: 500 })
-    }
+    const allNotifications = await prisma.notification.findMany({
+      where: { type: 'system' },
+      select: {
+        id: true,
+        user_id: true,
+        title: true,
+        message: true,
+        created_at: true,
+        metadata: true
+      },
+      orderBy: { created_at: 'desc' }
+    })
 
     if (!allNotifications || allNotifications.length === 0) {
       return NextResponse.json({ success: true, message: 'No notifications found' })
@@ -105,18 +123,9 @@ export async function POST(request: NextRequest) {
       const batchSize = 50
       for (let i = 0; i < idsToDelete.length; i += batchSize) {
         const batch = idsToDelete.slice(i, i + batchSize)
-        const { error: deleteError } = await supabaseAdmin
-          .from('notifications')
-          .delete()
-          .in('id', batch)
-        
-        if (deleteError) {
-          console.error('Error deleting batch:', deleteError)
-          return NextResponse.json({ 
-            success: false, 
-            error: `Failed to delete duplicates: ${deleteError.message}` 
-          }, { status: 500 })
-        }
+        await prisma.notification.deleteMany({
+          where: { id: { in: batch } }
+        })
       }
       
       console.log(`✅ Successfully deleted ${idsToDelete.length} duplicate notifications`)
@@ -154,18 +163,35 @@ export async function POST(request: NextRequest) {
 // GET method to check current notification status
 export async function GET() {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || !('id' in session.user)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check if current user is admin
+    const role = await prisma.userRole.findFirst({ 
+      where: { user_id: session.user.id as string } 
+    })
+
+    if (role?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+
     console.log('🔍 Checking notification status...')
     
     // Get all system notifications
-    const { data: allNotifications, error: fetchError } = await supabaseAdmin
-      .from('notifications')
-      .select('id, user_id, title, message, created_at, metadata')
-      .eq('type', 'system')
-      .order('created_at', { ascending: false })
-
-    if (fetchError) {
-      return NextResponse.json({ success: false, error: fetchError.message }, { status: 500 })
-    }
+    const allNotifications = await prisma.notification.findMany({
+      where: { type: 'system' },
+      select: {
+        id: true,
+        user_id: true,
+        title: true,
+        message: true,
+        created_at: true,
+        metadata: true
+      },
+      orderBy: { created_at: 'desc' }
+    })
 
     // Group by user and count by type
     const userStats = new Map<string, { welcome: number, tips: number, assignment: number, total: number }>()

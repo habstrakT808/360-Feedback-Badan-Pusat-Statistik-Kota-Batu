@@ -390,7 +390,10 @@ export function NotificationSettings({
               </label>
               <input
                 type="time"
-                value={preferences?.quiet_hours_start || "22:00"}
+                value={preferences?.quiet_hours_start ? 
+                  new Date(preferences.quiet_hours_start).toTimeString().slice(0, 5) : 
+                  "22:00"
+                }
                 onChange={(e) =>
                   updatePreference("quiet_hours_start", e.target.value)
                 }
@@ -403,7 +406,10 @@ export function NotificationSettings({
               </label>
               <input
                 type="time"
-                value={preferences?.quiet_hours_end || "08:00"}
+                value={preferences?.quiet_hours_end ? 
+                  new Date(preferences.quiet_hours_end).toTimeString().slice(0, 5) : 
+                  "08:00"
+                }
                 onChange={(e) =>
                   updatePreference("quiet_hours_end", e.target.value)
                 }

@@ -2,43 +2,20 @@
 "use client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { useSetUser } from "@/store/useStore";
-import { NotificationService } from "@/lib/notification-service";
+import { useSession } from "next-auth/react";
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUser = useSetUser();
+  const { data: session } = useSession();
 
   useEffect(() => {
-    // Initialize user state
-    const initializeAuth = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session?.user) {
-          setUser(session.user);
-        }
-      } catch (error) {
-        console.error("Error initializing auth:", error);
-      }
-    };
-
-    initializeAuth();
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        setUser(session.user);
-      } else if (event === "SIGNED_OUT") {
-        setUser(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [setUser]);
+    if (session?.user && 'id' in session.user) {
+      setUser({ id: session.user.id, email: session.user.email || "" } as any);
+    } else {
+      setUser(null);
+    }
+  }, [session?.user?.email, setUser]);
 
   return <>{children}</>;
 }

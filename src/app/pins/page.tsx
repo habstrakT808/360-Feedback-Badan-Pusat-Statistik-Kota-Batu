@@ -84,10 +84,17 @@ export default function PinsPage() {
         pinPeriod?.year ||
         currentYear) as number;
 
+      // Tentukan filter periode untuk ranking: pilih bulan/tahun jika ada; jika tidak gunakan rentang periode aktif
+      const rankingPeriod: any = (selectedMonth && selectedYear)
+        ? { month: targetMonth, year: targetYear }
+        : (activePinPeriod
+            ? { start: new Date(activePinPeriod.start_date).toISOString().slice(0,10), end: new Date(activePinPeriod.end_date).toISOString().slice(0,10) }
+            : 'active')
+
       const [monthly, allowance, members] = await Promise.all([
-        PinService.getMonthlyRanking(targetMonth, targetYear),
-        PinService.getMonthlyPinAllowance(user!.id),
-        PinService.getAvailableTeamMembers(user!.id),
+        PinService.getPinRankings(50, rankingPeriod),
+        PinService.getWeeklyPinAllowance(user!.id, targetMonth, targetYear),
+        PinService.getParticipants(),
       ]);
 
       // Debug: Log semua user ID untuk mengidentifikasi duplikat
@@ -97,8 +104,8 @@ export default function PinsPage() {
         monthly.map((u) => u.user_id)
       );
       console.log(
-        "Team Members IDs:",
-        members.map((m) => m.id)
+        "Pin Statistics:",
+        members
       );
       console.log("========================");
 
@@ -148,11 +155,16 @@ export default function PinsPage() {
   };
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const isWithinActivePinPeriod = !!(
-    activePinPeriod &&
-    todayStr >= activePinPeriod.start_date &&
-    todayStr <= activePinPeriod.end_date
-  );
+  const isWithinActivePinPeriod = (() => {
+    if (!activePinPeriod) return false;
+    try {
+      const start = new Date(activePinPeriod.start_date).toISOString().slice(0, 10);
+      const end = new Date(activePinPeriod.end_date).toISOString().slice(0, 10);
+      return todayStr >= start && todayStr <= end;
+    } catch {
+      return false;
+    }
+  })();
 
   const getMonthName = (month: number) => {
     const months = [

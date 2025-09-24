@@ -1,6 +1,7 @@
 // src/app/api/debug-notification/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,48 +23,39 @@ export async function POST(request: NextRequest) {
     
     console.log('Notification data:', simpleNotification)
     
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert([simpleNotification])
-      .select()
+    const createdNotification = await prisma.notification.create({
+      data: simpleNotification
+    })
     
-    if (error) {
-      console.error('Supabase insert error:', error)
-      return NextResponse.json({
-        success: false,
-        error: 'Supabase insert failed',
-        details: error,
-        errorCode: error.code,
-        errorMessage: error.message,
-        errorHint: error.hint
-      }, { status: 400 })
-    }
-    
-    console.log('Insert successful:', data)
+    console.log('Insert successful:', createdNotification)
     
     // Test 2: Check if user exists
-    const { data: userCheck, error: userError } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('id', testUserId)
-      .single()
+    const userCheck = await prisma.profile.findUnique({
+      where: { id: testUserId },
+      select: { id: true, full_name: true }
+    })
     
     // Test 3: Check notification table structure
-    const { data: tableInfo, error: tableError } = await supabase
-      .from('notifications')
-      .select('*')
-      .limit(1)
+    const tableInfo = await prisma.notification.findFirst({
+      select: {
+        id: true,
+        user_id: true,
+        title: true,
+        message: true,
+        type: true,
+        priority: true,
+        created_at: true
+      }
+    })
     
     return NextResponse.json({
       success: true,
       message: 'Notification created successfully',
       data: {
-        createdNotification: data,
+        createdNotification,
         userExists: !!userCheck,
         userInfo: userCheck,
-        userError,
-        tableStructure: tableInfo?.[0] || 'No existing notifications',
-        tableError
+        tableStructure: tableInfo || 'No existing notifications'
       }
     })
     

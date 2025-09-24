@@ -15,10 +15,10 @@ import {
   Pin,
   ChevronDown,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { useUser, useSetUser } from "@/store/useStore";
 import { toast } from "react-hot-toast";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { useUserRole } from "@/hooks/useUserRole";
 
 const navigation = [
@@ -80,24 +80,26 @@ export function Navigation() {
   useEffect(() => {
     const loadProfile = async () => {
       if (!user?.id) return;
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url")
-        .eq("id", user.id)
-        .single();
-      if (data) setProfile(data);
+      try {
+        const response = await fetch(`/api/team/user/${user.id}`);
+        const data = await response.json();
+        if (data.success && data.profile) {
+          setProfile(data.profile);
+        }
+      } catch (error) {
+        console.error("Error loading profile:", error);
+      }
     };
     loadProfile();
   }, [user?.id]);
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut({ scope: "local" });
-    if (error) {
-      toast.error("Gagal logout");
-    } else {
+    try {
+      await signOut({ callbackUrl: "/" });
       setUser(null);
       toast.success("Berhasil logout");
-      window.location.href = "/";
+    } catch (error) {
+      toast.error("Gagal logout");
     }
   };
 

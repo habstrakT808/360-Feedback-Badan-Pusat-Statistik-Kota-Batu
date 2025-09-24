@@ -2,38 +2,39 @@
 
 import { useState, useEffect } from "react";
 import { AdminService } from "@/lib/admin-service";
-import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 import { toast } from "react-hot-toast";
 
 export default function DebugAdminPage() {
-  const [user, setUser] = useState<any>(null);
+  const { data: session } = useSession();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    checkUser();
-  }, []);
+    if (session?.user && 'id' in session.user) {
+      checkAdminStatus();
+    }
+  }, [session]);
 
-  const checkUser = async () => {
+  const checkAdminStatus = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      
-      if (user) {
-        const adminStatus = await AdminService.isCurrentUserAdmin();
+      if (session?.user && 'id' in session.user) {
+        const adminStatus = await AdminService.isCurrentUserAdmin(session.user.id as string);
         setIsAdmin(adminStatus);
       }
     } catch (error) {
-      console.error("Error checking user:", error);
+      console.error("Error checking admin status:", error);
     }
   };
 
   const testAdminAccess = async () => {
     setLoading(true);
     try {
-      const adminStatus = await AdminService.isCurrentUserAdmin();
-      setIsAdmin(adminStatus);
-      toast.success(`Admin status: ${adminStatus}`);
+      if (session?.user && 'id' in session.user) {
+        const adminStatus = await AdminService.isCurrentUserAdmin(session.user.id as string);
+        setIsAdmin(adminStatus);
+        toast.success(`Admin status: ${adminStatus}`);
+      }
     } catch (error: any) {
       toast.error(`Error: ${error.message}`);
     } finally {
@@ -42,12 +43,12 @@ export default function DebugAdminPage() {
   };
 
   const testUpdateUser = async () => {
-    if (!user) return;
+    if (!session?.user || !('id' in session.user)) return;
     
     setLoading(true);
     try {
       // Test updating user profile
-      const result = await AdminService.updateUser(user.id, {
+      const result = await AdminService.updateUser(session.user.id as string, {
         full_name: "Test Update " + new Date().toLocaleTimeString()
       });
       toast.success("Update successful: " + result.full_name);
@@ -65,8 +66,8 @@ export default function DebugAdminPage() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">User Information</h2>
         <div className="space-y-2">
-          <p><strong>User ID:</strong> {user?.id || "Not logged in"}</p>
-          <p><strong>Email:</strong> {user?.email || "N/A"}</p>
+          <p><strong>User ID:</strong> {session?.user && 'id' in session.user ? (session.user.id as string) : "Not logged in"}</p>
+          <p><strong>Email:</strong> {session?.user?.email || "N/A"}</p>
           <p><strong>Admin Status:</strong> {isAdmin === null ? "Checking..." : isAdmin ? "✅ Admin" : "❌ Not Admin"}</p>
         </div>
       </div>
@@ -84,7 +85,7 @@ export default function DebugAdminPage() {
           
           <button
             onClick={testUpdateUser}
-            disabled={loading || !user}
+            disabled={loading || !session?.user || !('id' in session.user)}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 ml-2"
           >
             {loading ? "Testing..." : "Test Update User"}
@@ -95,8 +96,9 @@ export default function DebugAdminPage() {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold mb-4">Environment Check</h2>
         <div className="space-y-2">
-          <p><strong>Supabase URL:</strong> {process.env.NEXT_PUBLIC_SUPABASE_URL ? "✅ Set" : "❌ Not Set"}</p>
-          <p><strong>Service Role Key:</strong> {process.env.SUPABASE_SERVICE_ROLE_KEY ? "✅ Set" : "❌ Not Set"}</p>
+          <p><strong>Database URL:</strong> {process.env.DATABASE_URL ? "✅ Set" : "❌ Not Set"}</p>
+          <p><strong>NextAuth Secret:</strong> {process.env.NEXTAUTH_SECRET ? "✅ Set" : "❌ Not Set"}</p>
+          <p><strong>NextAuth URL:</strong> {process.env.NEXTAUTH_URL ? "✅ Set" : "❌ Not Set"}</p>
         </div>
       </div>
     </div>

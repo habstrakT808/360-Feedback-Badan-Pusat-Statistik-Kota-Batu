@@ -10,7 +10,6 @@ import { SupervisorService } from "@/lib/supervisor-service";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Loading } from "@/components/ui/Loading";
 import { toast } from "react-hot-toast";
-import { supabase } from "@/lib/supabase";
 import {
   Users,
   TrendingUp,
@@ -173,19 +172,17 @@ function SupervisorTeamView() {
 
   const loadPeriods = async () => {
     try {
-      const { data, error } = await supabase
-        .from("assessment_periods")
-        .select("*")
-        .order("year", { ascending: false })
-        .order("month", { ascending: false });
+      const response = await fetch('/api/admin/periods');
+      const data = await response.json();
+      
+      if (data.success) {
+        setPeriods(data.periods || []);
 
-      if (error) throw error;
-      setPeriods(data || []);
-
-      // Set current active period as default
-      const activePeriod = data?.find((p: any) => p.is_active);
-      if (activePeriod) {
-        setSelectedPeriod(activePeriod.id);
+        // Set current active period as default
+        const activePeriod = data.periods?.find((p: any) => p.is_active);
+        if (activePeriod) {
+          setSelectedPeriod(activePeriod.id);
+        }
       }
     } catch (error: any) {
       console.error("Error loading periods:", error);

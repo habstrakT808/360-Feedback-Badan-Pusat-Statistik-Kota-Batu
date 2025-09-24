@@ -27,10 +27,7 @@ export default function PinsFullResultsPage() {
         const targetYear = (selectedYear ??
           pinPeriod?.year ??
           currentYear) as number;
-        const ranking = await PinService.getMonthlyRankingAllUsers(
-          targetMonth,
-          targetYear
-        );
+        const ranking = await PinService.getPinRankings(50); // Get top 50 rankings
         setMonthlyRanking(ranking);
       } finally {
         setIsLoading(false);

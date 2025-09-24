@@ -3,8 +3,8 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { Providers } from "./providers";
 import { Toaster } from "react-hot-toast";
-import { SupabaseErrorBoundary } from "@/components/ui/SupabaseErrorBoundary";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import AuthSessionProvider from "@/components/providers/AuthSessionProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -33,38 +33,38 @@ export default function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={inter.className}>
-        <SupabaseErrorBoundary>
-          <ThemeProvider>
+        <ThemeProvider>
+          <AuthSessionProvider>
             <Providers>
               {children}
               <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: "#1f2937",
-                    color: "#fff",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    backdropFilter: "blur(10px)",
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: "#1f2937",
+                  color: "#fff",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  backdropFilter: "blur(10px)",
+                },
+                success: {
+                  iconTheme: {
+                    primary: "#10b981",
+                    secondary: "#fff",
                   },
-                  success: {
-                    iconTheme: {
-                      primary: "#10b981",
-                      secondary: "#fff",
-                    },
+                },
+                error: {
+                  iconTheme: {
+                    primary: "#ef4444",
+                    secondary: "#fff",
                   },
-                  error: {
-                    iconTheme: {
-                      primary: "#ef4444",
-                      secondary: "#fff",
-                    },
-                  },
-                }}
+                },
+              }}
               />
             </Providers>
-          </ThemeProvider>
-        </SupabaseErrorBoundary>
+          </AuthSessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

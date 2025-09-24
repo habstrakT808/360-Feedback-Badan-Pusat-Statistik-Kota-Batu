@@ -1,7 +1,8 @@
 // src/app/api/cron/daily-reminders/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { SmartNotificationServiceImproved } from '@/lib/smart-notification-service'
-import { supabase } from '@/lib/supabase'
+import { prisma } from '@/lib/prisma'
+
 
 export async function GET(request: NextRequest) {
   // Verify cron secret (untuk keamanan)
@@ -17,30 +18,36 @@ export async function GET(request: NextRequest) {
     await SmartNotificationServiceImproved.sendComprehensiveDailyReminders()
     
     // Get analytics summary
-    const { data: activePeriods } = await supabase
-      .from('assessment_periods')
-      .select('*')
-      .eq('is_active', true)
+    const activePeriods = await prisma.assessmentPeriod.findMany({
+      where: { is_active: true }
+    })
 
-    const { data: activePinPeriods } = await supabase
-      .from('pin_periods')
-      .select('*')
-      .eq('is_active', true)
+    const activePinPeriods = await prisma.pinPeriod.findMany({
+      where: { is_active: true }
+    })
 
-    const { data: activeTriwulanPeriods } = await supabase
-      .from('triwulan_periods')
-      .select('*')
-      .eq('is_active', true)
+    // Note: triwulan_periods model is not available in current schema
+    // const activeTriwulanPeriods = await prisma.triwulanPeriod.findMany({
+    //   where: { is_active: true }
+    // })
 
     // Get today's reminder count
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
-    const { data: todayReminders } = await supabase
-      .from('notifications')
-      .select('id, type, metadata')
-      .eq('type', 'reminder')
-      .gte('created_at', today.toISOString())
+    const todayReminders = await prisma.notification.findMany({
+      where: {
+        type: 'reminder',
+        created_at: {
+          gte: today
+        }
+      },
+      select: {
+        id: true,
+        type: true,
+        metadata: true
+      }
+    })
 
     const reminderStats = {
       total: todayReminders?.length || 0,
@@ -56,7 +63,7 @@ export async function GET(request: NextRequest) {
       active_periods: {
         assessment: activePeriods?.length || 0,
         pin: activePinPeriods?.length || 0,
-        triwulan: activeTriwulanPeriods?.length || 0
+        triwulan: 0 // TODO: Implement when triwulan model is available
       },
       reminders_sent_today: reminderStats
     })

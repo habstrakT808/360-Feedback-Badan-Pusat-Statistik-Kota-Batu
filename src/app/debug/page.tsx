@@ -1,28 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useSession } from "next-auth/react";
 
 export default function DebugPage() {
-  const [userInfo, setUserInfo] = useState<any>(null);
+  const { data: session, status } = useSession();
   const [isCleaning, setIsCleaning] = useState(false);
   const [cleanupResult, setCleanupResult] = useState<string>("");
 
   useEffect(() => {
-    const checkUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      console.log("Current session:", session);
-      setUserInfo({
-        user: session?.user,
-        userId: session?.user?.id,
-        email: session?.user?.email,
-      });
-    };
-
-    checkUser();
-  }, []);
+    console.log("Current session:", session);
+    console.log("Session status:", status);
+  }, [session, status]);
 
   const cleanupDuplicates = async () => {
     try {
@@ -58,7 +47,13 @@ export default function DebugPage() {
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-2">User Info</h2>
         <pre className="bg-gray-100 p-4 rounded overflow-auto">
-          {JSON.stringify(userInfo, null, 2)}
+          {JSON.stringify({
+            session,
+            status,
+            user: session?.user,
+            userId: session?.user && 'id' in session.user ? session.user.id : null,
+            email: session?.user?.email,
+          }, null, 2)}
         </pre>
       </div>
 

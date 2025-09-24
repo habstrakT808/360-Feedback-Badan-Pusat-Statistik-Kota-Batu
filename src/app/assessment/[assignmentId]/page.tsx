@@ -54,7 +54,7 @@ export default function RegularAssessmentPage() {
 
       // Get user's assignments to find this specific assignment
       const assignments = await AssessmentService.getMyAssignments(user.id);
-      const targetAssignment = assignments.find((a) => a.id === assignmentId);
+      const targetAssignment = assignments.find((a: any) => a.id === assignmentId);
 
       if (!targetAssignment) {
         toast.error("Assignment tidak ditemukan atau sudah diselesaikan");

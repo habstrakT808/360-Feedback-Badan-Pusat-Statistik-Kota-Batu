@@ -2,8 +2,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { supabase } from "@/lib/supabase";
 import { Star, Sparkles } from "lucide-react";
+// Removed Prisma usage in client; data will be fetched via API
 
 interface Comment {
   id: string;
@@ -29,34 +29,12 @@ export function FloatingComments({ userId, periodId }: FloatingCommentsProps) {
   const loadComments = async () => {
     try {
       setIsLoading(true);
-
-      let query = supabase
-        .from("feedback_responses")
-        .select(
-          `
-           id,
-           comment,
-           aspect,
-           created_at,
-           assignment:assessment_assignments!inner(
-             id,
-             period_id,
-             assessor_id
-           )
-         `
-        )
-        .eq("assignment.assessee_id", userId)
-        .not("comment", "is", null)
-        .neq("comment", "")
-        .order("created_at", { ascending: false });
-
-      if (selectedPeriod !== "all" && selectedPeriod) {
-        query = query.eq("assignment.period_id", selectedPeriod);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
+      const qs = new URLSearchParams();
+      qs.set('assesseeId', userId);
+      if (selectedPeriod !== 'all' && selectedPeriod) qs.set('periodId', selectedPeriod);
+      const res = await fetch(`/api/supervisor/team-results?${qs.toString()}`, { cache: 'no-store' });
+      const json = await res.json().catch(() => ({ results: [] }));
+      const data = Array.isArray(json.results) ? json.results : [];
 
       const seenKeys = new Set<string>();
       const processedComments: Comment[] = (data || [])
