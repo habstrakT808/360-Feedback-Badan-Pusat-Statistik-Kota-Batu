@@ -8,8 +8,10 @@ export async function GET() {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const adminUsers = await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } })
-    const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+    const adminUsers: Array<{ user_id: string | null }> = await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } })
+    const adminUserIds = adminUsers
+      .map((u: { user_id: string | null }) => u.user_id)
+      .filter((id: string | null): id is string => !!id)
 
     const profiles = await prisma.profile.findMany({
       where: { id: { notIn: adminUserIds } },

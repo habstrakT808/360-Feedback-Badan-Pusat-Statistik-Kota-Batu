@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
   }
 
   const targetAssignmentId = realAssignmentId || assignmentId
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.feedbackResponse.deleteMany({ where: { assignment_id: targetAssignmentId } })
     if (responses.length > 0) {
       await tx.feedbackResponse.createMany({

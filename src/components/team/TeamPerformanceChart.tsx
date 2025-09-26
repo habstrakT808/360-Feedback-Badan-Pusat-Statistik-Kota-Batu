@@ -150,9 +150,10 @@ export function TeamPerformanceChart({ teamData }: TeamPerformanceChartProps) {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ range, count, percent }) =>
-                  `${range}: ${percent ? (percent * 100).toFixed(0) : 0}%`
-                }
+                label={({ range, count, percent }) => {
+                  const p = Number(percent ?? 0)
+                  return `${range}: ${Number.isFinite(p) ? (p * 100).toFixed(0) : 0}%`
+                }}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="count"

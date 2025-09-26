@@ -82,7 +82,7 @@ export class SmartNotificationServiceImproved {
 
       // Create a more specific key for duplicate detection
       const existingKeys = new Set(
-        (existingNotifications || []).map(n => 
+        (existingNotifications || []).map((n: { title: string; message: string; type: string; created_at: Date }) => 
           this.createNotificationKey(n.title, n.message)
         )
       )
@@ -194,7 +194,7 @@ export class SmartNotificationServiceImproved {
       })
 
       const assignmentList = assignments || []
-      const pendingAssignments = assignmentList.filter(a => !a.is_completed)
+      const pendingAssignments = assignmentList.filter((a: { is_completed: boolean; assessee?: { full_name: string } | null }) => !a.is_completed)
       const pendingCount = pendingAssignments.length
 
       if (pendingCount === 0) return null
@@ -207,7 +207,7 @@ export class SmartNotificationServiceImproved {
       // Get assignee names (max 3)
       const assigneeNames = pendingAssignments
         .slice(0, 3)
-        .map(a => a.assessee?.full_name || 'Rekan kerja')
+        .map((a: { assessee?: { full_name: string } | null }) => a.assessee?.full_name || 'Rekan kerja')
         .join(', ')
 
       const remainingText = pendingCount > 3 ? ` dan ${pendingCount - 3} lainnya` : ''
@@ -283,7 +283,7 @@ export class SmartNotificationServiceImproved {
       // Group by user_id + title to find duplicates
       const groupedNotifications = new Map<string, any[]>()
       
-      duplicates.forEach(notification => {
+      duplicates.forEach((notification: { user_id: string; title: string; created_at: Date; id: string }) => {
         const key = `${notification.user_id}|${notification.title}`
         if (!groupedNotifications.has(key)) {
           groupedNotifications.set(key, [])
@@ -352,15 +352,15 @@ export class SmartNotificationServiceImproved {
 
       if (existingNotifications && existingNotifications.length >= 3) {
         // Check if user has all 3 types of notifications
-        const hasWelcome = existingNotifications.some(n => 
+        const hasWelcome = existingNotifications.some((n: { id: string; title: string; type: string; created_at: Date; metadata: any }) => 
           (typeof n.metadata === 'object' && n.metadata && 'notification_type' in n.metadata && n.metadata.notification_type === 'welcome') || 
           n.title?.includes('Selamat datang')
         )
-        const hasTips = existingNotifications.some(n => 
+        const hasTips = existingNotifications.some((n: { id: string; title: string; type: string; created_at: Date; metadata: any }) => 
           (typeof n.metadata === 'object' && n.metadata && 'notification_type' in n.metadata && n.metadata.notification_type === 'tips') || 
           n.title?.includes('Tips')
         )
-        const hasAssignment = existingNotifications.some(n => 
+        const hasAssignment = existingNotifications.some((n: { id: string; title: string; type: string; created_at: Date; metadata: any }) => 
           (typeof n.metadata === 'object' && n.metadata && 'notification_type' in n.metadata && n.metadata.notification_type === 'assignment') || 
           n.title?.includes('Penilaian Menunggu')
         )
@@ -415,7 +415,7 @@ export class SmartNotificationServiceImproved {
       // Group by notification type
       const groupedByType = new Map<string, any[]>()
       
-      userNotifications.forEach(notification => {
+      userNotifications.forEach((notification: { id: string; title: string; message: string; created_at: Date; metadata: any }) => {
         let type = 'unknown'
         
         if (typeof notification.metadata === 'object' && notification.metadata && 'notification_type' in notification.metadata && typeof notification.metadata.notification_type === 'string') {
@@ -545,7 +545,7 @@ export class SmartNotificationServiceImproved {
       // Group by user and count
       const userCounts = new Map<string, { name: string; count: number }>()
       
-      pendingData.forEach(item => {
+      pendingData.forEach((item: { assessor_id: string; assessor?: { full_name: string } | null }) => {
         const userId = item.assessor_id
         const userName = item.assessor?.full_name || 'Unknown'
         
@@ -605,8 +605,8 @@ export class SmartNotificationServiceImproved {
         select: { user_id: true }
       })
 
-      const adminIds = adminUsers?.map(u => u.user_id) || []
-      const regularUsers = users.filter(user => !adminIds.includes(user.id))
+      const adminIds = adminUsers?.map((u: { user_id: string | null }) => u.user_id).filter((id: string | null): id is string => !!id) || []
+      const regularUsers = users.filter((user: { id: string }) => !adminIds.includes(user.id))
 
       console.log(`📧 Processing ${regularUsers.length} users for daily reminders...`)
 
@@ -723,7 +723,7 @@ export class SmartNotificationServiceImproved {
       // Only send reminder if deadline is approaching or there are many pending
       if (daysLeft > 7 && pendingAssignments.length < 3) return null
 
-      const assesseeNames = pendingAssignments.map(a => a.assessee?.full_name || 'Unknown').join(', ')
+      const assesseeNames = pendingAssignments.map((a: { id: string; assessee?: { full_name: string } | null }) => a.assessee?.full_name || 'Unknown').join(', ')
       
       return {
         user_id: userId,

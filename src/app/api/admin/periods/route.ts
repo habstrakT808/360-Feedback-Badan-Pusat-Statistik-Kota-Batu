@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,16 +24,18 @@ export async function GET(request: NextRequest) {
 
     const periods = await prisma.assessmentPeriod.findMany({ orderBy: [{ year: 'desc' }, { month: 'desc' }] })
     // augment with assigned/completed counts
-    const ids = periods.map(p => p.id)
+    const ids = periods.map((p: { id: string }) => p.id)
     const assignments = await prisma.assessmentAssignment.groupBy({
       by: ['period_id', 'is_completed'],
       where: { period_id: { in: ids } },
       _count: { _all: true },
     })
-    const enriched = periods.map(p => {
-      const a = assignments.filter(x => x.period_id === p.id)
-      const assigned = a.reduce((sum, x) => sum + (x._count?._all ?? 0), 0)
-      const completed = a.filter(x => x.is_completed === true).reduce((s, x) => s + (x._count?._all ?? 0), 0)
+    const enriched = periods.map((p: any) => {
+      const a = assignments.filter((x: { period_id: string | null }) => x.period_id === p.id)
+      const assigned = a.reduce((sum: number, x: { _count: { _all: number } }) => sum + (x._count?._all ?? 0), 0)
+      const completed = a
+        .filter((x: { is_completed: boolean | null }) => x.is_completed === true)
+        .reduce((s: number, x: { _count: { _all: number } }) => s + (x._count?._all ?? 0), 0)
       return { ...p, assigned_count: assigned, completed_count: completed }
     })
     return NextResponse.json({ data: enriched })
@@ -108,12 +111,12 @@ export async function DELETE(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     // Hapus data terkait dalam transaksi berurutan agar tidak melanggar FK
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const assignments = await tx.assessmentAssignment.findMany({
         where: { period_id: id },
         select: { id: true },
       })
-      const assignmentIds = assignments.map(a => a.id)
+      const assignmentIds = assignments.map((a: { id: string }) => a.id)
       if (assignmentIds.length > 0) {
         await tx.feedbackResponse.deleteMany({ where: { assignment_id: { in: assignmentIds } } })
       }
@@ -148,8 +151,25 @@ export async function PATCH(request: NextRequest) {
     if (updates.year !== undefined) data.year = updates.year
     if (updates.start_date) data.start_date = new Date(updates.start_date)
     if (updates.end_date) data.end_date = new Date(updates.end_date)
-    if (updates.is_active !== undefined) data.is_active = !!updates.is_active
     if (updates.is_completed !== undefined) data.is_completed = !!updates.is_completed
+
+    // Handle is_active with proper logic to ensure only one active period
+    if (updates.is_active !== undefined) {
+      const isActivating = !!updates.is_active
+      
+      if (isActivating) {
+        // If activating this period, deactivate all others first
+        await prisma.assessmentPeriod.updateMany({
+          where: { 
+            id: { not: id },
+            is_active: true 
+          },
+          data: { is_active: false }
+        })
+      }
+      
+      data.is_active = isActivating
+    }
 
     const updated = await prisma.assessmentPeriod.update({ where: { id }, data })
     return NextResponse.json({ success: true, period: updated })

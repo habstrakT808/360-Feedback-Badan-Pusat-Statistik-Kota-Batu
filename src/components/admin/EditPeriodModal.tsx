@@ -33,6 +33,7 @@ export function EditPeriodModal({
     year: period?.year || new Date().getFullYear(),
     start_date: period?.start_date || "",
     end_date: period?.end_date || "",
+    is_active: period?.is_active || false,
   });
 
   const monthNames = [
@@ -57,6 +58,7 @@ export function EditPeriodModal({
         year: period.year,
         start_date: period.start_date,
         end_date: period.end_date,
+        is_active: period.is_active,
       });
     }
   }, [period]);
@@ -81,9 +83,10 @@ export function EditPeriodModal({
         year: formData.year,
         start_date: formData.start_date,
         end_date: formData.end_date,
+        is_active: formData.is_active,
       });
 
-      toast.success("Periode berhasil diperbarui");
+      toast.success("Periode berhasil diperbarui!");
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -284,6 +287,29 @@ export function EditPeriodModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
+              </div>
+
+              {/* Active Status */}
+              <div>
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_active}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        is_active: e.target.checked,
+                      }))
+                    }
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Periode Aktif
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-7">
+                  Centang untuk mengaktifkan periode ini sebagai periode penilaian aktif
+                </p>
               </div>
 
               {/* Actions */}

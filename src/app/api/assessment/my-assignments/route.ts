@@ -22,7 +22,8 @@ export async function GET() {
     // Supervisor menilai semua (kecuali admin dan dirinya sendiri) tanpa perlu assignment eksplisit
     const excludedIds = new Set(
       (await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } }))
-        .map(r => r.user_id).filter((v): v is string => !!v)
+        .map((r: { user_id: string | null }) => r.user_id)
+        .filter((v: string | null): v is string => !!v)
     )
     excludedIds.add(prof.id)
     const targets = await prisma.profile.findMany({
@@ -31,7 +32,7 @@ export async function GET() {
       orderBy: { full_name: 'asc' },
     })
     // Bentuk struktur mirip assignment agar UI tetap bekerja
-    list = targets.map(t => ({
+    list = targets.map((t: { id: string }) => ({
       id: `supervisor-${t.id}`,
       period_id: active.id,
       assessor_id: prof.id,

@@ -66,7 +66,7 @@ export function PinDetailModal({
       const periodForMonth = Array.isArray(jsonPeriod.data) ? jsonPeriod.data.find((p: any) => p.year === year && p.month === (month || 1)) : null;
 
       let pins: any[] | null = null;
-      let pinsError: any = null;
+      const pinsError: any = null;
 
       if (
         periodForMonth &&

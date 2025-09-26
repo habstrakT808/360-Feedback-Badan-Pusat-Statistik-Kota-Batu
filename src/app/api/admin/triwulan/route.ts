@@ -135,7 +135,7 @@ export async function PATCH(request: NextRequest) {
       where: { year: oldYear, month: { in: monthsOld } },
       select: { id: true },
     })
-    const oldPeriodIds = oldPeriods.map(p => p.id)
+    const oldPeriodIds = oldPeriods.map((p: { id: string }) => p.id)
 
     if (oldPeriodIds.length > 0) {
       // Delete dependents referencing the old periods
@@ -143,7 +143,7 @@ export async function PATCH(request: NextRequest) {
         where: { period_id: { in: oldPeriodIds } },
         select: { id: true },
       })
-      const oldAssignmentIds = oldAssignments.map(a => a.id)
+      const oldAssignmentIds = oldAssignments.map((a: { id: string }) => a.id)
       if (oldAssignmentIds.length > 0) {
         await prisma.feedbackResponse.deleteMany({ where: { assignment_id: { in: oldAssignmentIds } } })
         await prisma.assessmentAssignment.deleteMany({ where: { id: { in: oldAssignmentIds } } })
@@ -211,7 +211,7 @@ export async function DELETE(request: NextRequest) {
       where: { year: y, month: { in: months } },
       select: { id: true },
     })
-    const periodIds = periods.map(p => p.id)
+    const periodIds = periods.map((p: { id: string }) => p.id)
 
     if (periodIds.length === 0) {
       return NextResponse.json({ success: true })
@@ -222,7 +222,7 @@ export async function DELETE(request: NextRequest) {
       where: { period_id: { in: periodIds } },
       select: { id: true },
     })
-    const assignmentIds = assignments.map(a => a.id)
+    const assignmentIds = assignments.map((a: { id: string }) => a.id)
 
     if (assignmentIds.length > 0) {
       await prisma.feedbackResponse.deleteMany({ where: { assignment_id: { in: assignmentIds } } })

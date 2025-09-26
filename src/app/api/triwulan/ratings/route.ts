@@ -53,7 +53,9 @@ export async function GET(request: NextRequest) {
         WHERE period_id = ${periodId} AND rater_id = ${raterId}::uuid
       `
       const obj: Record<string, number[]> = {}
-      rows.forEach(r => { obj[r.candidate_id] = r.scores as any })
+      rows.forEach((r: { candidate_id: string; scores: number[] }) => {
+        obj[r.candidate_id] = r.scores as any
+      })
       return NextResponse.json({ map: obj })
     }
 

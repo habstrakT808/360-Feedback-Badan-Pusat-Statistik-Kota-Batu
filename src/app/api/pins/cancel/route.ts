@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     const month = coveringPeriod?.month ?? (givenAt.getUTCMonth() + 1)
     const year = coveringPeriod?.year ?? givenAt.getUTCFullYear()
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.employeePin.delete({ where: { id: pinId } })
 
       // Ensure allowance row

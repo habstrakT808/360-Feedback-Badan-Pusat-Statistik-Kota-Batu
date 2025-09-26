@@ -63,22 +63,25 @@ export async function GET(request: Request) {
     _count: { receiver_id: true }
   })
 
-		const userIds = pinCounts.map(p => p.receiver_id).filter((id): id is string => !!id)
-		const users = await prisma.profile.findMany({
+		const userIds = pinCounts
+			.map((p: { receiver_id: string | null }) => p.receiver_id)
+			.filter((id: string | null): id is string => !!id)
+		type UserLite = { id: string; full_name: string | null; avatar_url: string | null }
+		const users: UserLite[] = await prisma.profile.findMany({
 			where: { id: { in: userIds } },
 			select: { id: true, full_name: true, avatar_url: true }
 		})
-		const userMap = new Map(users.map(u => [u.id, u]))
+		const userMap: Map<string, UserLite> = new Map(users.map((u: UserLite) => [u.id, u]))
 
 		const rankings = pinCounts
-			.map((p) => {
+			.map((p: { receiver_id: string | null; _count: { receiver_id: number } }) => {
 				if (!p.receiver_id) return null
 				const u = userMap.get(p.receiver_id)
 				if (!u) return null
 				return {
 					user_id: p.receiver_id,
 					full_name: u.full_name,
-					avatar_url: u.avatar_url || undefined,
+					avatar_url: (u.avatar_url ?? undefined),
 					pin_count: p._count.receiver_id
 				}
 			})

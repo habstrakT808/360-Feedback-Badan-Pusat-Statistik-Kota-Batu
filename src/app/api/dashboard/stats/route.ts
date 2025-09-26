@@ -20,8 +20,8 @@ export async function GET() {
     const isSupervisor = supervisorIds.includes(userId)
     const maxAssignments = isSupervisor ? 999 : 5
 
-    const profiles = await prisma.profile.findMany({ where: { id: { not: userId } }, select: { id: true } })
-    const totalEmployees = profiles.filter((p) => !adminIds.includes(p.id)).length
+    const profiles: Array<{ id: string | null }> = await prisma.profile.findMany({ where: { id: { not: userId } }, select: { id: true } })
+    const totalEmployees = profiles.filter((p: { id: string | null }) => !adminIds.includes(p.id as string)).length
 
     if (!currentPeriod) {
       return NextResponse.json({
@@ -41,23 +41,23 @@ export async function GET() {
       })
     }
 
-    const myAssignments = await prisma.assessmentAssignment.findMany({
+    const myAssignments: Array<{ assessee_id: string; is_completed: boolean } & { assessee: { id: string; full_name: string | null; username: string | null; position: string | null; department: string | null } }> = await prisma.assessmentAssignment.findMany({
       where: { assessor_id: userId, period_id: currentPeriod.id },
       include: { assessee: { select: { id: true, full_name: true, username: true, position: true, department: true } } }
     })
-    const validAssignments = myAssignments.filter((a) => !adminIds.includes(a.assessee_id))
-    const completedAssessments = validAssignments.filter((a) => a.is_completed).length
+    const validAssignments = myAssignments.filter((a: { assessee_id: string }) => !adminIds.includes(a.assessee_id))
+    const completedAssessments = validAssignments.filter((a: { is_completed: boolean }) => a.is_completed).length
     const pendingAssessments = isSupervisor ? totalEmployees - completedAssessments : Math.max(0, maxAssignments - completedAssessments)
     const totalAssignments = isSupervisor ? totalEmployees : maxAssignments
     const myProgress = totalAssignments > 0 ? Math.round((completedAssessments / totalAssignments) * 100) : 0
 
-    const myFeedback = await prisma.feedbackResponse.findMany({
+    const myFeedback: Array<{ rating: number }> = await prisma.feedbackResponse.findMany({
       where: { assignment: { assessee_id: userId, period_id: currentPeriod.id } },
       select: { rating: true }
     })
     let averageRating = 0
     if (myFeedback.length > 0) {
-      const totalRating = myFeedback.reduce((sum, f) => sum + f.rating, 0)
+      const totalRating = myFeedback.reduce((sum: number, f: { rating: number }) => sum + f.rating, 0)
       averageRating = Math.round((totalRating / myFeedback.length) * 10) / 10
     }
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   const year = active.year ?? new Date().getFullYear()
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       let current = allowance
       if (!current) {
         current = await tx.monthlyPinAllowance.create({

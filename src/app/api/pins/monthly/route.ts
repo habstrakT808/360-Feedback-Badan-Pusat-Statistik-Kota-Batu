@@ -32,14 +32,21 @@ export async function GET(request: Request) {
   const ids = Array.from(counts.keys())
   const profiles = await prisma.profile.findMany({ where: { id: { in: ids } }, select: { id: true, full_name: true, avatar_url: true } })
 
-  const rankings = profiles.map((u) => ({
+  type Ranking = { user_id: string; full_name: string | null; avatar_url?: string; pin_count: number }
+  const rankings: Ranking[] = profiles.map((u: { id: string; full_name: string | null; avatar_url: string | null }) => ({
     user_id: u.id,
     full_name: u.full_name,
     avatar_url: u.avatar_url ?? undefined,
     pin_count: counts.get(u.id) || 0,
   }))
-  rankings.sort((a, b) => b.pin_count - a.pin_count || a.full_name.localeCompare(b.full_name))
-  const ranked = rankings.map((r, i) => ({ ...r, rank: i + 1 }))
+  rankings.sort((a: { pin_count: number; full_name: string | null }, b: { pin_count: number; full_name: string | null }) => {
+    const diff = b.pin_count - a.pin_count
+    if (diff !== 0) return diff
+    const an = a.full_name || ''
+    const bn = b.full_name || ''
+    return an.localeCompare(bn)
+  })
+  const ranked = rankings.map((r: Ranking, i: number) => ({ ...r, rank: i + 1 }))
   return NextResponse.json(ranked)
 }
 

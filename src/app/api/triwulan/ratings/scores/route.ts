@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       GROUP BY candidate_id
     `
 
-    const scores = rows.map(r => ({
+    const scores = rows.map((r: { candidate_id: string; total?: number; num_raters?: number; avg_score?: number }) => ({
       candidate_id: r.candidate_id as string,
       total_score: Number(r.total || 0),
       num_raters: Number(r.num_raters || 0),

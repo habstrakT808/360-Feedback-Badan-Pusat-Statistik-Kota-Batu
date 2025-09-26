@@ -26,21 +26,23 @@ export async function GET(request: NextRequest) {
       select: { id: true, assessee_id: true, is_completed: true },
     })
 
-    const assignmentIds = assignments.map(a => a.id)
-    let countsByAssignment = new Map<string, number>()
+    const assignmentIds = assignments.map((a: { id: string }) => a.id)
+    const countsByAssignment = new Map<string, number>()
     if (assignmentIds.length > 0) {
       const grouped = await prisma.feedbackResponse.groupBy({
         by: ['assignment_id'],
         where: { assignment_id: { in: assignmentIds } },
         _count: { _all: true },
       })
-      grouped.forEach(g => countsByAssignment.set(g.assignment_id as string, (g._count?._all as number) || 0))
+      grouped.forEach((g: { assignment_id: string | null; _count: { _all: number } }) => {
+        countsByAssignment.set((g.assignment_id as string) || '', (g._count?._all as number) || 0)
+      })
     }
 
     const ids = assignments
-      .filter(a => a.is_completed || (countsByAssignment.get(a.id) || 0) > 0)
-      .map(a => a.assessee_id)
-      .filter((v): v is string => !!v)
+      .filter((a: { id: string; is_completed: boolean }) => a.is_completed || (countsByAssignment.get(a.id) || 0) > 0)
+      .map((a: { assessee_id: string | null }) => a.assessee_id)
+      .filter((v: string | null): v is string => !!v)
     return NextResponse.json({ ids })
   } catch (e: any) {
     console.error('Error in supervisor/assessed:', e)

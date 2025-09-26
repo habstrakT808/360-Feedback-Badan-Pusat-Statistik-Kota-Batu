@@ -11,8 +11,8 @@ export async function GET() {
     // Everyone logged-in can read participants
     const adminIds = new Set(
       (await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } }))
-        .map((r) => r.user_id)
-        .filter(Boolean) as string[]
+        .map((r: { user_id: string | null }) => r.user_id)
+        .filter((id: string | null): id is string => !!id)
     )
 
     const participants = await prisma.profile.findMany({

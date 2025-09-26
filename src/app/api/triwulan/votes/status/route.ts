@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const rows = await prisma.$queryRaw<any[]>`
       SELECT voter_id FROM public.triwulan_vote_completion WHERE period_id = ${periodId}
     `
-    const completedUserIds = rows.map(r => r.voter_id as string)
+    const completedUserIds = rows.map((r: { voter_id: string }) => r.voter_id as string)
     const totalProfiles = await prisma.profile.count()
     const requiredCount = totalProfiles
     const completedCount = completedUserIds.length

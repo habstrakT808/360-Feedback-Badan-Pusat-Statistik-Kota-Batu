@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function getAssessmentData(periodFilter: string, startDate?: string, endDate?: string, selectedPeriod?: string) {
-  let whereClause: any = {};
+  const whereClause: any = {};
 
   // Apply period filter
   if (periodFilter === 'specific') {
@@ -104,7 +104,7 @@ async function getAssessmentData(periodFilter: string, startDate?: string, endDa
   const { supervisorIds } = await RolesService.getRoleUserIds();
 
   // Transform data for export
-  return data?.map(assignment => {
+  return data?.map((assignment: any) => {
     const responses = assignment.feedbacks || [];
     const totalRating = responses.reduce((sum: number, r: any) => sum + (r.rating || 0), 0);
     const averageRating = responses.length > 0 ? totalRating / responses.length : 0;
@@ -157,7 +157,7 @@ async function getAssessmentData(periodFilter: string, startDate?: string, endDa
 }
 
 async function getPinData(periodFilter: string, startDate?: string, endDate?: string, selectedPeriod?: string) {
-  let whereClause: any = {};
+  const whereClause: any = {};
 
   // Apply period filter
   if (periodFilter === 'specific') {
@@ -234,7 +234,7 @@ async function getPinData(periodFilter: string, startDate?: string, endDate?: st
     }
   });
 
-  return data?.map(pin => ({
+  return data?.map((pin: any) => ({
     // Pin Info
     pin_id: pin.id,
     given_at: pin.given_at,
@@ -276,17 +276,24 @@ async function getTriwulanData(periodFilter: string, startDate?: string, endDate
     ORDER BY total_score DESC
   `
   // Attach names for readability
-  const ids = rows.map(r => r.candidate_id).filter(Boolean)
+  const ids: string[] = Array.from(
+    new Set(
+      rows
+        .map((r: any) => r.candidate_id)
+        .filter((v: any): v is string => typeof v === 'string' && v.length > 0)
+    )
+  )
   const profiles = await prisma.profile.findMany({
     where: { id: { in: ids } },
     select: { id: true, full_name: true, department: true, position: true }
   })
-  const map = new Map(profiles.map(p => [p.id, p]))
-  return rows.map(r => ({
+  const map: Map<string, { id: string; full_name?: string | null; department?: string | null; position?: string | null }> =
+    new Map(profiles.map((p: any) => [p.id as string, p]))
+  return rows.map((r: any) => ({
     candidate_id: r.candidate_id,
-    candidate_name: map.get(r.candidate_id)?.full_name || r.candidate_id,
-    position: map.get(r.candidate_id)?.position || null,
-    department: map.get(r.candidate_id)?.department || null,
+    candidate_name: (map.get(r.candidate_id) as any)?.full_name || r.candidate_id,
+    position: (map.get(r.candidate_id) as any)?.position || null,
+    department: (map.get(r.candidate_id) as any)?.department || null,
     total_score: Number(r.total_score || 0),
     items: Number(r.num_items || 0)
   }))
@@ -302,30 +309,39 @@ async function getTriwulanDetailedRatings(periodId: string) {
     WHERE r.period_id = ${periodId}
   `
   // Hydrate names
-  const ids = Array.from(new Set(rows.flatMap(r => [r.rater_id, r.candidate_id]).filter(Boolean)))
+  const ids = Array.from(new Set(rows.flatMap((r: any) => [r.rater_id, r.candidate_id]).filter(Boolean)))
   const profiles = await prisma.profile.findMany({
     where: { id: { in: ids } },
     select: { id: true, full_name: true, email: true }
   })
-  const nameById = new Map(profiles.map(p => [p.id, p.full_name]))
-  const emailById = new Map(profiles.map(p => [p.id, p.email]))
+  const nameById: Map<string, string | null> = new Map(
+    profiles.map((p: any) => [p.id as string, (p.full_name as string | null) ?? null])
+  )
+  const emailById: Map<string, string | null> = new Map(
+    profiles.map((p: any) => [p.id as string, (p.email as string | null) ?? null])
+  )
 
   // Fallback: if some ids are not Profile.id, try resolving by User.id -> User.email -> Profile by email
-  const missingIds = ids.filter(id => !nameById.has(id))
+  const missingIds: string[] = (ids as string[]).filter((id) => !nameById.has(id))
   if (missingIds.length > 0) {
     const users = await prisma.user.findMany({ where: { id: { in: missingIds } }, select: { id: true, email: true } })
-    const userEmailById = new Map(users.map(u => [u.id, u.email || null]))
-    const emails = users.map(u => u.email).filter((e): e is string => !!e)
+    const userEmailById: Map<string, string | null> = new Map(users.map((u: any) => [u.id as string, u.email || null]))
+    const emails = users
+      .map((u: { email: string | null }) => u.email)
+      .filter((e: string | null): e is string => typeof e === 'string' && e.length > 0)
     if (emails.length > 0) {
-      const profByEmail = await prisma.profile.findMany({ where: { email: { in: emails } }, select: { id: true, full_name: true, email: true } })
-      const profByEmailMap = new Map(profByEmail.map(p => [p.email || '', p]))
+      type ProfileLite = { id: string; full_name: string | null; email: string | null }
+      const profByEmail: ProfileLite[] = await prisma.profile.findMany({ where: { email: { in: emails } }, select: { id: true, full_name: true, email: true } })
+      const profByEmailMap: Map<string, ProfileLite> = new Map(
+        profByEmail.map((p: ProfileLite) => [p.email || '', p])
+      )
       for (const uid of missingIds) {
         const em = userEmailById.get(uid)
-        const p = em ? profByEmailMap.get(em) : undefined
+        const p: ProfileLite | undefined = em ? profByEmailMap.get(em || '') : undefined
         if (p) {
           // Map the User.id to the corresponding profile's name/email for export display
-          nameById.set(uid, p.full_name || em || uid)
-          emailById.set(uid, p.email || em || '')
+          nameById.set(uid, (p.full_name ?? em ?? uid))
+          emailById.set(uid, (p.email ?? em ?? ''))
         } else if (em) {
           emailById.set(uid, em)
         }
@@ -333,7 +349,7 @@ async function getTriwulanDetailedRatings(periodId: string) {
     }
   }
   // Return in the exact shape the frontend expects for the sheet
-  return rows.map(r => {
+  return rows.map((r: { rater_id: string; candidate_id: string; scores: any }) => {
     const scores = (r.scores as any[]).map(n => Number(n))
     const rec: any = {
       'Penilai': nameById.get(r.rater_id) || r.rater_id,

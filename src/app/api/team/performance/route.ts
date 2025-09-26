@@ -45,14 +45,27 @@ export async function GET(request: NextRequest) {
     })
 
     // Distinct assessors who provided any feedback
-    const assessorIds = Array.from(new Set(feedbackData.map(f => f.assignment.assessor_id).filter(Boolean) as string[]))
+    type FeedbackWithAssessor = { rating: number; assignment: { assessor_id: string | null } }
+    const assessorIds = Array.from(
+      new Set(
+        (feedbackData as FeedbackWithAssessor[])
+          .map((f: FeedbackWithAssessor) => f.assignment.assessor_id)
+          .filter((id: string | null): id is string => !!id)
+      )
+    )
 
     // Lookup roles for these assessors to separate supervisor vs peer
-    const assessorRoles = await prisma.userRole.findMany({ where: { user_id: { in: assessorIds } } })
-    const supervisorSet = new Set(assessorRoles.filter(r => r.role === 'supervisor').map(r => r.user_id))
+    const assessorRoles: Array<{ user_id: string | null; role: string | null }> = await prisma.userRole.findMany({ where: { user_id: { in: assessorIds } } })
+    const supervisorSet = new Set(
+      assessorRoles.filter((r: { role: string | null }) => r.role === 'supervisor').map((r: { user_id: string | null }) => r.user_id as string)
+    )
 
-    const supervisorRatings = feedbackData.filter(f => supervisorSet.has(f.assignment.assessor_id)).map(f => f.rating)
-    const peerRatings = feedbackData.filter(f => !supervisorSet.has(f.assignment.assessor_id)).map(f => f.rating)
+    const supervisorRatings = (feedbackData as FeedbackWithAssessor[])
+      .filter((f: FeedbackWithAssessor) => supervisorSet.has(f.assignment.assessor_id as string))
+      .map((f: FeedbackWithAssessor) => f.rating)
+    const peerRatings = (feedbackData as FeedbackWithAssessor[])
+      .filter((f: FeedbackWithAssessor) => !supervisorSet.has(f.assignment.assessor_id as string))
+      .map((f: FeedbackWithAssessor) => f.rating)
 
     const supAvg = supervisorRatings.length > 0 ? supervisorRatings.reduce((s, r) => s + r, 0) / supervisorRatings.length : 0
     const peerAvg = peerRatings.length > 0 ? peerRatings.reduce((s, r) => s + r, 0) / peerRatings.length : 0
@@ -60,18 +73,18 @@ export async function GET(request: NextRequest) {
     const totalFeedback = assessorIds.length
 
     // Assignments where profile is assessor in period
-    const assessorAssignments = await prisma.assessmentAssignment.findMany({
+    const assessorAssignments: Array<{ is_completed: boolean }> = await prisma.assessmentAssignment.findMany({
       where: { assessor_id: profile.id, period_id: currentPeriod.id },
       select: { is_completed: true },
     })
-    const completedAssessments = assessorAssignments.filter(a => a.is_completed).length
+    const completedAssessments = assessorAssignments.filter((a: { is_completed: boolean }) => a.is_completed).length
     const maxAssignments = assessorAssignments.length
     const periodProgress = maxAssignments > 0 ? (completedAssessments / maxAssignments) * 100 : 0
 
     // Total employees (exclude admins)
     const adminIds = (await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } }))
-      .map(r => r.user_id)
-      .filter(Boolean) as string[]
+      .map((r: { user_id: string | null }) => r.user_id)
+      .filter((id: string | null): id is string => !!id)
     const totalEmployees = await prisma.profile.count({ where: { id: { notIn: adminIds } } })
 
     const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']

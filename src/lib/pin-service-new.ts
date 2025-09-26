@@ -91,7 +91,7 @@ export class PinService {
       })
 
       // Get user details for each receiver
-      const userIds = pinCounts.map(p => p.receiver_id).filter((id): id is string => !!id)
+      const userIds = pinCounts.map((p: { receiver_id: string | null; _count: { receiver_id: number } }) => p.receiver_id).filter((id: string | null): id is string => !!id)
       const users = await prisma.profile.findMany({
         where: {
           id: { in: userIds }
@@ -104,12 +104,12 @@ export class PinService {
       })
 
       // Create user map for quick lookup
-      const userMap = new Map(users.map(user => [user.id, user]))
+      const userMap = new Map(users.map((user: { id: string; full_name: string; avatar_url: string | null }) => [user.id, user]))
 
       // Create rankings
       const rankings = pinCounts
-        .map((pinCount, index) => {
-          const user = userMap.get(pinCount.receiver_id || '')
+        .map((pinCount: { receiver_id: string | null; _count: { receiver_id: number } }, index: number) => {
+          const user = userMap.get(pinCount.receiver_id || '') as { id: string; full_name: string; avatar_url: string | null } | undefined
           if (!user) return null
 
           return {
@@ -120,12 +120,12 @@ export class PinService {
             rank: index + 1
           }
         })
-        .filter((ranking) => ranking !== null)
-        .sort((a, b) => b.pin_count - a.pin_count)
-        .slice(0, limit)
+        .filter((ranking: any) => ranking !== null)
+        .sort((a: any, b: any) => b.pin_count - a.pin_count)
+        .slice(0, limit) as PinRanking[]
 
       // Update ranks after sorting
-      rankings.forEach((ranking, index) => {
+      rankings.forEach((ranking: any, index: number) => {
         ranking.rank = index + 1
       })
 

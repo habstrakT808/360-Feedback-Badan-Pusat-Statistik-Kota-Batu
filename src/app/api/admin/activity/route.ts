@@ -38,10 +38,14 @@ export async function GET(request: NextRequest) {
     })
 
     const adminUsers = await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } })
-    const adminIds = new Set(adminUsers.map((u) => u.user_id).filter((id): id is string => !!id))
+    const adminIds = new Set(
+      adminUsers
+        .map((u: { user_id: string | null }) => u.user_id)
+        .filter((id: string | null): id is string => typeof id === 'string' && id.length > 0)
+    )
 
     const filtered = activities.filter(
-      (a) => a.assessor && a.assessee && a.period && !adminIds.has(a.assessor.id) && !adminIds.has(a.assessee.id)
+      (a: any) => a.assessor && a.assessee && a.period && !adminIds.has(a.assessor.id) && !adminIds.has(a.assessee.id)
     )
 
     return NextResponse.json({ success: true, activities: filtered })

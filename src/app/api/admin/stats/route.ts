@@ -10,9 +10,9 @@ export async function GET() {
       where: { is_active: true }
     })
 
-    const allProfiles = await prisma.profile.findMany({ select: { id: true } })
+    const allProfiles: Array<{ id: string | null }> = await prisma.profile.findMany({ select: { id: true } })
     const eligibleUserIds = allProfiles
-      .map((p) => p.id)
+      .map((p: { id: string | null }) => p.id)
       .filter((id): id is string => !!id && !adminIds.includes(id) && !supervisorIds.includes(id))
 
     const totalEligibleUsers = eligibleUserIds.length

@@ -28,10 +28,10 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: { user_id: string | null }) => u.user_id).filter((id: string | null): id is string => !!id)
 
       // Filter out admin users and additional safety checks
-      const filteredData = profiles.filter(profile => {
+      const filteredData = profiles.filter((profile: { id: string; email: string; full_name: string }) => {
         // Exclude by admin user IDs
         if (adminUserIds.includes(profile.id)) {
           return false
@@ -59,12 +59,11 @@ export class TeamService {
 
   static async getTeamPerformance(periodId?: string) {
     try {
-      let whereClause: any = {}
-      if (periodId) {
-        whereClause.assignment = {
+      const whereClause: any = periodId ? {
+        assignment: {
           period_id: periodId
         }
-      }
+      } : {}
 
       const feedbackData = await prisma.feedbackResponse.findMany({
         where: whereClause,
@@ -84,7 +83,7 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: { user_id: string | null }) => u.user_id).filter((id: string | null): id is string => !!id)
 
       // Group by employee
       const employeePerformance = new Map()
@@ -169,10 +168,7 @@ export class TeamService {
 
   static async getAssignmentStats(periodId?: string) {
     try {
-      let whereClause: any = {}
-      if (periodId) {
-        whereClause.period_id = periodId
-      }
+      const whereClause: any = periodId ? { period_id: periodId } : {}
 
       const assignments = await prisma.assessmentAssignment.findMany({
         where: whereClause,
@@ -189,18 +185,18 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: { user_id: string | null }) => u.user_id).filter((id: string | null): id is string => !!id)
 
       // Filter out assignments involving admin users
-      const filteredAssignments = assignments.filter(assignment => 
+      const filteredAssignments = assignments.filter((assignment: { assessor_id: string; assessee_id: string; is_completed: boolean }) => 
         !adminUserIds.includes(assignment.assessor_id) && 
         !adminUserIds.includes(assignment.assessee_id)
       )
 
       const stats = {
         total: filteredAssignments.length,
-        completed: filteredAssignments.filter(a => a.is_completed).length,
-        pending: filteredAssignments.filter(a => !a.is_completed).length,
+        completed: filteredAssignments.filter((a: { is_completed: boolean }) => a.is_completed).length,
+        pending: filteredAssignments.filter((a: { is_completed: boolean }) => !a.is_completed).length,
         completionRate: 0
       }
 
@@ -250,13 +246,13 @@ export class TeamService {
 
       // Count unique assessors who rated this user
       const uniqueAssessors = new Set(
-        feedbackData.map(f => f.assignment.assessor_id)
+        feedbackData.map((f: { assignment: { assessor_id: string } }) => f.assignment.assessor_id)
       )
-      let totalFeedback = uniqueAssessors.size
+      const totalFeedback = uniqueAssessors.size
       let averageRating = 0
 
       if (feedbackData.length > 0) {
-        averageRating = feedbackData.reduce((sum, f) => sum + f.rating, 0) / feedbackData.length
+        averageRating = feedbackData.reduce((sum: number, f: { rating: number }) => sum + f.rating, 0) / feedbackData.length
       }
 
       // Get assignments where this user is the assessor (people this user needs to rate)
@@ -268,7 +264,7 @@ export class TeamService {
       })
 
       // Count completed assessments where this user is the assessor
-      let completedAssessments = assessorAssignments.filter(a => a.is_completed).length
+      const completedAssessments = assessorAssignments.filter((a: { is_completed: boolean }) => a.is_completed).length
 
       // Get total employees (excluding admin/supervisor)
       const allProfiles = await prisma.profile.findMany({
@@ -280,7 +276,7 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: { user_id: string | null }) => u.user_id).filter((id: any): id is string => !!id)
       const totalEmployees = allProfiles.length - adminUserIds.length
 
       // User's max assignments (5 for regular users)

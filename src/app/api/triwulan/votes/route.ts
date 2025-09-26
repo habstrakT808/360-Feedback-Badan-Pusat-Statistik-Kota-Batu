@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
         SELECT candidate_id FROM public.triwulan_votes
         WHERE period_id = ${periodId} AND voter_id = ${voterId}::uuid
       `
-      return NextResponse.json({ votes: rows.map(r => r.candidate_id) })
+      return NextResponse.json({ votes: rows.map((r: { candidate_id: string }) => r.candidate_id) })
     }
     return NextResponse.json({ votes: [] })
   } catch (e: any) {

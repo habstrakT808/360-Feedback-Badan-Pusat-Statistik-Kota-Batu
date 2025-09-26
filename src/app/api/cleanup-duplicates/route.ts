@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Group by user_id and notification type
-    const userNotificationGroups = new Map<string, Map<string, any[]>>()
+    const userNotificationGroups = new Map<string, Map<string, any[]>>() 
     
-    allNotifications.forEach(notification => {
+    allNotifications.forEach((notification: { id: string; user_id: string; title: string | null; message: string | null; created_at: Date; metadata: unknown }) => {
       const userId = notification.user_id
       let type = 'unknown'
       
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Also remove assignment notifications (we only want welcome + tips)
-    const assignmentNotifications = allNotifications.filter(n => {
+    const assignmentNotifications = allNotifications.filter((n: { id: string; user_id: string; title: string | null; message: string | null; created_at: Date; metadata: unknown }) => {
       let type = 'unknown'
       if (
         n.metadata &&
@@ -111,7 +111,9 @@ export async function POST(request: NextRequest) {
     })
     
     if (assignmentNotifications.length > 0) {
-      idsToDelete.push(...assignmentNotifications.map(n => n.id))
+      idsToDelete.push(
+        ...assignmentNotifications.map((n: { id: string }) => n.id)
+      )
       totalDuplicates += assignmentNotifications.length
       console.log(`Removing ${assignmentNotifications.length} assignment notifications (not needed for initial setup)`)
     }
@@ -196,7 +198,7 @@ export async function GET() {
     // Group by user and count by type
     const userStats = new Map<string, { welcome: number, tips: number, assignment: number, total: number }>()
     
-    allNotifications?.forEach(notification => {
+    allNotifications?.forEach((notification: { id: string; user_id: string; title: string | null; message: string | null; created_at: Date; metadata: unknown }) => {
       const userId = notification.user_id
       let type = 'unknown'
       

@@ -49,11 +49,12 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    type ReminderLite = { id: string; type: string; metadata: unknown }
     const reminderStats = {
       total: todayReminders?.length || 0,
-      assessment_360: todayReminders?.filter(r => typeof r.metadata === 'object' && r.metadata !== null && 'notification_type' in r.metadata && (r.metadata as any).notification_type === 'daily_reminder_360').length || 0,
-      pin_system: todayReminders?.filter(r => typeof r.metadata === 'object' && r.metadata !== null && 'notification_type' in r.metadata && (r.metadata as any).notification_type === 'daily_reminder_pin').length || 0,
-      triwulan: todayReminders?.filter(r => typeof r.metadata === 'object' && r.metadata !== null && 'notification_type' in r.metadata && (r.metadata as any).notification_type === 'daily_reminder_triwulan').length || 0
+      assessment_360: todayReminders?.filter((r: ReminderLite) => typeof r.metadata === 'object' && r.metadata !== null && 'notification_type' in r.metadata && (r.metadata as any).notification_type === 'daily_reminder_360').length || 0,
+      pin_system: todayReminders?.filter((r: ReminderLite) => typeof r.metadata === 'object' && r.metadata !== null && 'notification_type' in r.metadata && (r.metadata as any).notification_type === 'daily_reminder_pin').length || 0,
+      triwulan: todayReminders?.filter((r: ReminderLite) => typeof r.metadata === 'object' && r.metadata !== null && 'notification_type' in r.metadata && (r.metadata as any).notification_type === 'daily_reminder_triwulan').length || 0
     }
     
     return NextResponse.json({ 

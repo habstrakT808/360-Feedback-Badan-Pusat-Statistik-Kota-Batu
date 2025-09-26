@@ -52,7 +52,9 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const adminUserIds = targetUserRoles.map(u => u.user_id).filter(Boolean);
+    const adminUserIds = targetUserRoles
+      .map((u: { user_id: string | null }) => u.user_id)
+      .filter((id: string | null): id is string => typeof id === 'string' && id.length > 0);
     if (adminUserIds.length > 0) {
       return NextResponse.json(
         { error: 'Cannot delete admin users' },

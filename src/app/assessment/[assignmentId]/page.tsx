@@ -32,18 +32,18 @@ export default function RegularAssessmentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (user && assignmentId) {
-      loadAssignment();
-    }
-  }, [user, assignmentId]);
-
-  // Load draft on mount
+  // Load draft on mount first
   const draftKey = user ? `draft:regular:${user.id}:${assignmentId}` : "";
   useEffect(() => {
     if (!user || !assignmentId) return;
     const draft = DraftService.get(draftKey);
     if (draft) setResponses(draft);
+  }, [user, assignmentId]);
+
+  useEffect(() => {
+    if (user && assignmentId) {
+      loadAssignment();
+    }
   }, [user, assignmentId]);
 
   const loadAssignment = async () => {
@@ -299,12 +299,10 @@ export default function RegularAssessmentPage() {
         {/* Assessment Form - Per Aspek */}
         <div className="space-y-8">
           {ASSESSMENT_ASPECTS.map((aspect, aspectIndex) => {
-            const response =
-              responses[aspect.id] ||
-              ({
-                rating: undefined,
-                comment: "",
-              } as any);
+            const response = responses[aspect.id] || {
+              rating: undefined,
+              comment: "",
+            };
 
             return (
               <motion.div

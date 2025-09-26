@@ -35,15 +35,17 @@ export async function POST(request: NextRequest) {
     // Build eligible users (exclude admins/supervisors)
     const adminIds = new Set(
       (await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } }))
-        .map(r => r.user_id).filter((v): v is string => !!v)
+        .map((r: { user_id: string | null }) => r.user_id)
+        .filter((v: string | null): v is string => !!v)
     )
     const supervisorIds = new Set(
       (await prisma.userRole.findMany({ where: { role: 'supervisor' }, select: { user_id: true } }))
-        .map(r => r.user_id).filter((v): v is string => !!v)
+        .map((r: { user_id: string | null }) => r.user_id)
+        .filter((v: string | null): v is string => !!v)
     )
-    const profiles = await prisma.profile.findMany({ select: { id: true } })
+    const profiles: Array<{ id: string | null }> = await prisma.profile.findMany({ select: { id: true } })
     const eligible = profiles
-      .map(p => p.id)
+      .map((p: { id: string | null }) => p.id)
       .filter((id): id is string => !!id && !adminIds.has(id) && !supervisorIds.has(id))
 
     if (eligible.length < 2) {
@@ -55,7 +57,9 @@ export async function POST(request: NextRequest) {
       where: { period_id: targetPeriodId },
       select: { assessor_id: true, assessee_id: true }
     })
-    const existingPairs = new Set(existing.map(e => `${e.assessor_id}:${e.assessee_id}`))
+    const existingPairs = new Set(
+      existing.map((e: { assessor_id: string | null; assessee_id: string | null }) => `${e.assessor_id}:${e.assessee_id}`)
+    )
 
     // For each assessor, pick up to 5 unique assessees (not self), avoiding duplicates
     const toCreate: Array<{ assessor_id: string, assessee_id: string, period_id: string }> = []

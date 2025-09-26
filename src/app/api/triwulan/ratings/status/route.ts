@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
       WHERE period_id = ${periodId}
       GROUP BY rater_id
     `
-    const completedUserIds = ratingRows.filter(r => Number(r.cnt) > 0).map(r => r.rater_id as string)
+    const completedUserIds = ratingRows
+      .filter((r: { cnt: number; rater_id: string }) => Number(r.cnt) > 0)
+      .map((r: { rater_id: string }) => r.rater_id as string)
     // requiredCount: total employees minus admins (approximate via profiles count)
     const totalProfiles = await prisma.profile.count()
     const requiredCount = totalProfiles

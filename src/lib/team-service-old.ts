@@ -28,10 +28,10 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: any) => u.user_id).filter((id: any): id is string => !!id)
 
       // Filter out admin users and additional safety checks
-      const filteredData = profiles.filter(profile => {
+      const filteredData = profiles.filter((profile: any) => {
         // Exclude by admin user IDs
         if (adminUserIds.includes(profile.id)) {
           return false
@@ -97,7 +97,7 @@ export class TeamService {
       select: { user_id: true }
     })
 
-    adminUserIds = (adminUsers || []).map(u => u.user_id).filter((id): id is string => !!id)
+    adminUserIds = (adminUsers || []).map((u: any) => u.user_id).filter((id: any): id is string => !!id)
 
     // Group by employee
     const employeePerformance = new Map()
@@ -141,7 +141,7 @@ export class TeamService {
       // Calculate aspect averages
       const aspectAverages: { [key: string]: number } = {}
       emp.aspectRatings.forEach((ratings: number[], aspect: string) => {
-        aspectAverages[aspect] = ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+        aspectAverages[aspect] = ratings.reduce((sum: number, r: number) => sum + r, 0) / ratings.length
       })
       emp.aspectAverages = aspectAverages
 
@@ -212,7 +212,7 @@ export class TeamService {
       select: { user_id: true }
     })
 
-    adminUserIds = (adminUsers || []).map(u => u.user_id).filter((id): id is string => !!id)
+    adminUserIds = (adminUsers || []).map((u: any) => u.user_id).filter((id: any): id is string => !!id)
 
     // Filter out assignments involving admin users
     const filteredAssignments = data?.filter((assignment: any) => 
@@ -276,7 +276,7 @@ export class TeamService {
       const uniqueAssessors = new Set(
         feedbackData?.map((f: any) => f.assignment.assessor_id) || []
       )
-      let totalFeedback = uniqueAssessors.size
+      const totalFeedback = uniqueAssessors.size
       let averageRating = 0
 
       // Log feedback debugging
@@ -294,9 +294,9 @@ export class TeamService {
       if (feedbackData && feedbackData.length > 0) {
         console.log('📊 Detailed feedback data:', {
           firstFeedback: feedbackData[0],
-          ratings: feedbackData.map(f => f.rating),
-          aspects: feedbackData.map(f => f.aspect),
-          assessors: feedbackData.map(f => f.assignment?.assessor_id)
+          ratings: feedbackData.map((f: any) => f.rating),
+          aspects: feedbackData.map((f: any) => f.aspect),
+          assessors: feedbackData.map((f: any) => f.assignment?.assessor_id)
         })
       }
 
@@ -438,7 +438,7 @@ export class TeamService {
       })
 
       // Count completed assessments where this user is the assessor
-      let completedAssessments = assessorAssignments?.filter((a: any) => a.is_completed)?.length || 0
+      const completedAssessments = assessorAssignments?.filter((a: any) => a.is_completed)?.length || 0
 
       // Log assignment debugging
       console.log('📋 Assignment debug:', {
@@ -457,7 +457,7 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers?.map(u => u.user_id) || []
+      const adminUserIds = adminUsers?.map((u: any) => u.user_id) || []
       const totalEmployees = (allProfiles?.length || 0) - adminUserIds.length
 
       // Log employee count debugging

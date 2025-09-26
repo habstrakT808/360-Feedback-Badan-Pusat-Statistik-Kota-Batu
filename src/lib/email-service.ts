@@ -190,7 +190,7 @@ export class EmailService {
         select: { id: true }
       });
       
-      return profiles?.map(p => p.id) || [];
+      return profiles?.map((p: { id: string }) => p.id) || [];
     } catch (error) {
       console.warn('Failed to resolve user IDs from emails:', error);
       return [];

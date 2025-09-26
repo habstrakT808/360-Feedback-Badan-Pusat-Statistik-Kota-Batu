@@ -27,8 +27,8 @@ export class TeamService {
       // Server-side fallback
       const profiles = await prisma.profile.findMany({ orderBy: { full_name: 'asc' } })
       const adminUsers = await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } })
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
-      return profiles.filter(p => !adminUserIds.includes(p.id))
+      const adminUserIds = adminUsers.map((u: any) => u.user_id).filter((id: any): id is string => !!id)
+      return profiles.filter((p: any) => !adminUserIds.includes(p.id))
     } catch (error) {
       console.error('Error fetching team members:', error)
       throw error
@@ -40,12 +40,11 @@ export class TeamService {
       if (typeof window !== 'undefined') {
         return []
       }
-      let whereClause: any = {}
-      if (periodId) {
-        whereClause.assignment = {
+      const whereClause: any = periodId ? {
+        assignment: {
           period_id: periodId
         }
-      }
+      } : {}
 
       const feedbackData = await prisma.feedbackResponse.findMany({
         where: whereClause,
@@ -65,7 +64,7 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: any) => u.user_id).filter((id: any): id is string => !!id)
 
       // Group by employee
       const employeePerformance = new Map()
@@ -109,7 +108,7 @@ export class TeamService {
         // Calculate aspect averages
         const aspectAverages: { [key: string]: number } = {}
         emp.aspectRatings.forEach((ratings: number[], aspect: string) => {
-          aspectAverages[aspect] = ratings.reduce((sum, r) => sum + r, 0) / ratings.length
+          aspectAverages[aspect] = ratings.reduce((sum: number, r: number) => sum + r, 0) / ratings.length
         })
         emp.aspectAverages = aspectAverages
 
@@ -159,10 +158,7 @@ export class TeamService {
       if (typeof window !== 'undefined') {
         return { stats: { total: 0, completed: 0, pending: 0, completionRate: 0 }, assignments: [] }
       }
-      let whereClause: any = {}
-      if (periodId) {
-        whereClause.period_id = periodId
-      }
+      const whereClause: any = periodId ? { period_id: periodId } : {}
 
       const assignments = await prisma.assessmentAssignment.findMany({
         where: whereClause,
@@ -179,18 +175,18 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: any) => u.user_id).filter((id: any): id is string => !!id)
 
       // Filter out assignments involving admin users
-      const filteredAssignments = assignments.filter(assignment => 
+      const filteredAssignments = assignments.filter((assignment: any) =>
         !adminUserIds.includes(assignment.assessor_id) && 
         !adminUserIds.includes(assignment.assessee_id)
       )
 
       const stats = {
         total: filteredAssignments.length,
-        completed: filteredAssignments.filter(a => a.is_completed).length,
-        pending: filteredAssignments.filter(a => !a.is_completed).length,
+        completed: filteredAssignments.filter((a: any) => a.is_completed).length,
+        pending: filteredAssignments.filter((a: any) => !a.is_completed).length,
         completionRate: 0
       }
 
@@ -242,16 +238,12 @@ export class TeamService {
         }
       })
 
-      // Count unique assessors who rated this user
-      const uniqueAssessors = new Set(
-        feedbackData.map(f => f.assignment.assessor_id)
-      )
       // Total feedback = jumlah response untuk periode ini
-      let totalFeedback = feedbackData.length
+      const totalFeedback = feedbackData.length
       let averageRating = 0
 
       if (feedbackData.length > 0) {
-        averageRating = feedbackData.reduce((sum, f) => sum + f.rating, 0) / feedbackData.length
+        averageRating = feedbackData.reduce((sum: number, f: any) => sum + f.rating, 0) / feedbackData.length
       }
 
       // Get assignments where this user is the assessor (people this user needs to rate) for target period
@@ -263,7 +255,7 @@ export class TeamService {
       })
 
       // Count completed assessments where this user is the assessor
-      let completedAssessments = assessorAssignments.filter(a => a.is_completed).length
+      const completedAssessments = assessorAssignments.filter((a: any) => a.is_completed).length
 
       // Get total employees (excluding admin/supervisor)
       const allProfiles = await prisma.profile.findMany({
@@ -275,7 +267,7 @@ export class TeamService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers.map((u: any) => u.user_id).filter((id: any): id is string => !!id)
       const totalEmployees = allProfiles.length - adminUserIds.length
 
       // Max assignments = jumlah penugasan aktual pada periode tersebut

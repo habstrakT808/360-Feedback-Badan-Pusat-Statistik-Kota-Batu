@@ -18,7 +18,8 @@ export async function GET(_request: NextRequest) {
 
     // Exclude admins and self
     const adminIds = (await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } }))
-      .map(r => r.user_id).filter((v): v is string => !!v)
+      .map((r: { user_id: string | null }) => r.user_id)
+      .filter((v: string | null): v is string => !!v)
 
     const excluded = new Set<string>([...adminIds, me.id])
 

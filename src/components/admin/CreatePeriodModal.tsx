@@ -232,14 +232,13 @@ export function CreatePeriodModal({
               </div>
 
               {/* Warning */}
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl">
                 <div className="flex items-start space-x-3">
-                  <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
-                  <div className="text-sm text-yellow-800">
-                    <p className="font-medium">Perhatian</p>
+                  <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium">Informasi</p>
                     <p>
-                      Membuat periode baru akan menonaktifkan periode yang
-                      sedang aktif.
+                      Periode baru akan dibuat dalam status tidak aktif. Anda dapat mengaktifkannya melalui menu edit periode.
                     </p>
                   </div>
                 </div>

@@ -55,10 +55,12 @@ export class AdminService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers
+        .map((u: { user_id: string | null }) => u.user_id)
+        .filter((id: string | null): id is string => !!id)
       
       // Filter out admin users
-      return profiles.filter(user => !adminUserIds.includes(user.id))
+      return profiles.filter((user: { id: string }) => !adminUserIds.includes(user.id))
     } catch (error) {
       console.error('Error fetching users:', error)
       throw error
@@ -220,9 +222,9 @@ export class AdminService {
       })
 
       // Process the data to get actual counts
-      const processedData = periods.map(period => {
+      const processedData = periods.map((period: { assignments: Array<{ is_completed: boolean }> } & any) => {
         const assignedCount = period.assignments.length
-        const completedCount = period.assignments.filter(a => a.is_completed).length
+        const completedCount = period.assignments.filter((a: { is_completed: boolean }) => a.is_completed).length
 
         return {
           ...period,
@@ -245,19 +247,13 @@ export class AdminService {
     end_date: string
   }) {
     try {
-      // Deactivate current active period
-      await prisma.assessmentPeriod.updateMany({
-        where: { is_active: true },
-        data: { is_active: false }
-      })
-
-      // Create new period
+      // Create new period without automatically activating it
       const newPeriod = await prisma.assessmentPeriod.create({
         data: {
           ...periodData,
           start_date: new Date(periodData.start_date),
           end_date: new Date(periodData.end_date),
-          is_active: true
+          is_active: false // Let users manually activate periods
         }
       })
 
@@ -375,8 +371,8 @@ export class AdminService {
       })
 
       const eligibleUserIds = allProfiles
-        .map(p => p.id)
-        .filter(id => id && !adminIds.includes(id) && !supervisorIds.includes(id))
+        .map((p: { id: string | null }) => p.id as string | null)
+        .filter((id: string | null): id is string => !!id && !adminIds.includes(id) && !supervisorIds.includes(id))
 
       const totalEligibleUsers = eligibleUserIds.length
 
@@ -414,7 +410,7 @@ export class AdminService {
       }
 
       // Users who completed all 5 peer assessments
-      const usersCompletedAllFive = eligibleUserIds.filter(uid =>
+      const usersCompletedAllFive = eligibleUserIds.filter((uid: string) =>
         (assessorToCompletedCount.get(uid) || 0) >= 5
       ).length
 
@@ -481,10 +477,12 @@ export class AdminService {
         select: { user_id: true }
       })
 
-      const adminUserIds = adminUsers.map(u => u.user_id).filter((id): id is string => !!id)
+      const adminUserIds = adminUsers
+        .map((u: { user_id: string | null }) => u.user_id)
+        .filter((id: string | null): id is string => !!id)
 
       // Filter out any entries with missing required data and admin users
-      const validActivities = recentActivity.filter(activity => 
+      const validActivities = recentActivity.filter((activity: { assessor?: { id: string }; assessee?: { id: string }; period?: { id: string } }) => 
         activity.assessor && 
         activity.assessee && 
         activity.period &&

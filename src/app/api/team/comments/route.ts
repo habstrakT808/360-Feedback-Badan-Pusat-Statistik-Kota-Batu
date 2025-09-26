@@ -41,18 +41,49 @@ export async function GET(request: NextRequest) {
       include: { assignment: { select: { assessor: { select: { id: true, full_name: true, avatar_url: true } } } } }
     })
 
-    const comments = responses
-      .filter(r => r.comment && r.comment.trim().length > 0)
-      .map(r => ({
-        id: r.id,
-        text: r.comment as string,
-        created_at: r.created_at,
-        author: {
-          id: r.assignment.assessor?.id,
-          full_name: r.assignment.assessor?.full_name,
-          avatar_url: r.assignment.assessor?.avatar_url || null,
+    type ResponseWithAssessor = {
+      id: string
+      comment: string | null
+      created_at: Date
+      assignment: { assessor: { id: string | null; full_name: string | null; avatar_url: string | null } | null }
+    }
+    
+    // Group comments by assessor to avoid duplicates
+    const commentsByAssessor = new Map<string, {
+      id: string
+      text: string
+      created_at: Date
+      author: {
+        id: string | null
+        full_name: string | null
+        avatar_url: string | null
+      }
+    }>()
+
+    ;(responses as ResponseWithAssessor[])
+      .filter((r: ResponseWithAssessor) => r.comment !== null && r.comment.trim().length > 0)
+      .forEach((r: ResponseWithAssessor) => {
+        const assessorId = r.assignment.assessor?.id || 'anonymous'
+        const comment = r.comment as string
+        
+        // Only keep the latest comment from each assessor
+        if (!commentsByAssessor.has(assessorId) || 
+            commentsByAssessor.get(assessorId)!.created_at < r.created_at) {
+          commentsByAssessor.set(assessorId, {
+            id: r.id,
+            text: comment,
+            created_at: r.created_at,
+            author: {
+              id: r.assignment.assessor?.id || null,
+              full_name: r.assignment.assessor?.full_name || null,
+              avatar_url: r.assignment.assessor?.avatar_url || null,
+            }
+          })
         }
-      }))
+      })
+
+    const comments = Array.from(commentsByAssessor.values())
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
 
     return NextResponse.json({ comments })
   } catch (e: any) {
