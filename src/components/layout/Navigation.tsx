@@ -238,9 +238,7 @@ export function Navigation() {
               {/* User Name and Email */}
               <div className="text-center">
                 <p className="text-sm font-medium text-white truncate">
-                  {profile?.full_name ||
-                    user?.user_metadata?.full_name ||
-                    user?.email}
+                  {profile?.full_name || user?.name || user?.email}
                 </p>
                 <p className="text-xs text-slate-400 truncate">{user?.email}</p>
                 {/* Role Badge + Settings */}

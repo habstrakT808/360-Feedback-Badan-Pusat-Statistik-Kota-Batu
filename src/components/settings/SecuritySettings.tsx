@@ -115,7 +115,7 @@ export function SecuritySettings() {
           <div>
             <h3 className="font-semibold text-green-900">Akun Aman</h3>
             <p className="text-sm text-green-700">
-              Akun Anda terlindungi dengan autentikasi Supabase
+              Akun Anda terlindungi dengan autentikasi internal
             </p>
           </div>
         </div>

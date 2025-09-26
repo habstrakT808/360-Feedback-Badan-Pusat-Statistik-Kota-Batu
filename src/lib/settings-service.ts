@@ -27,13 +27,15 @@ export class SettingsService {
   // Upload avatar and update profile.avatar_url
   static async uploadAvatar(userId: string, file: File): Promise<UserProfile> {
     try {
-      // For now, return a placeholder URL
-      // TODO: Implement actual file upload to your preferred storage service
-      const avatarUrl = `https://via.placeholder.com/150/007bff/ffffff?text=${userId.charAt(0).toUpperCase()}`
-
-      // Update profile with new avatar URL
-      const updated = await this.updateProfile(userId, { avatar_url: avatarUrl })
-      return updated
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: form })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to upload avatar')
+      }
+      const json = await res.json()
+      return json.profile as UserProfile
     } catch (error) {
       console.error('Error uploading avatar:', error)
       throw new Error('Failed to upload avatar')

@@ -1,14 +1,26 @@
 // src/store/useStore.ts
 import { create } from 'zustand'
-import { User } from '@supabase/supabase-js'
-import { Database } from '../../lib/database.types'
 
-type AssessmentPeriod = Database['public']['Tables']['assessment_periods']['Row']
+// Minimal client-side types to avoid Supabase dependency
+type AppUser = {
+  id: string
+  email?: string | null
+  name?: string | null
+}
+
+type AssessmentPeriod = {
+  id: string
+  month: number
+  year: number
+  start_date: string | Date
+  end_date: string | Date
+  is_active?: boolean | null
+}
 
 interface AppState {
-  user: User | null
+  user: AppUser | null
   currentPeriod: AssessmentPeriod | null
-  setUser: (user: User | null) => void
+  setUser: (user: AppUser | null) => void
   setCurrentPeriod: (period: AssessmentPeriod | null) => void
   reset: () => void
 }

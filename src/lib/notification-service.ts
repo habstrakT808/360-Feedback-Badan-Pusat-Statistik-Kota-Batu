@@ -87,13 +87,13 @@ export class NotificationService {
   // Get user notifications from database
   static async getUserNotifications(userId: string, limit = 50): Promise<Notification[]> {
     try {
-      if (typeof window !== 'undefined') return []
-      const data = await prisma.notification.findMany({
-        where: { user_id: userId },
-        orderBy: { created_at: 'desc' },
-        take: limit
-      })
-
+      if (typeof window !== 'undefined') {
+        const res = await fetch(`/api/notifications/list?limit=${encodeURIComponent(String(limit))}`, { cache: 'no-store' })
+        if (!res.ok) return []
+        const json = await res.json().catch(() => ({}))
+        return json.data || []
+      }
+      const data = await prisma.notification.findMany({ where: { user_id: userId }, orderBy: { created_at: 'desc' }, take: limit })
       return data || []
     } catch (error) {
       console.error('Failed to get user notifications:', error)
@@ -104,7 +104,12 @@ export class NotificationService {
   // Get unread count
   static async getUnreadCount(userId: string): Promise<number> {
     try {
-      if (typeof window !== 'undefined') return 0
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/notifications/unread-count', { cache: 'no-store' })
+        if (!res.ok) return 0
+        const json = await res.json().catch(() => ({}))
+        return json.count || 0
+      }
       const count = await prisma.notification.count({
         where: {
           user_id: userId,
@@ -122,7 +127,10 @@ export class NotificationService {
   // Mark notification as read
   static async markAsRead(notificationId: string): Promise<void> {
     try {
-      if (typeof window !== 'undefined') return
+      if (typeof window !== 'undefined') {
+        await fetch('/api/notifications/mark-read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: notificationId }) })
+        return
+      }
       await prisma.notification.update({
         where: { id: notificationId },
         data: { 
@@ -139,7 +147,10 @@ export class NotificationService {
   // Mark all as read
   static async markAllAsRead(userId: string): Promise<void> {
     try {
-      if (typeof window !== 'undefined') return
+      if (typeof window !== 'undefined') {
+        await fetch('/api/notifications/mark-all-read', { method: 'POST' })
+        return
+      }
       await prisma.notification.updateMany({
         where: { 
           user_id: userId,
@@ -159,7 +170,10 @@ export class NotificationService {
   // Delete notification
   static async deleteNotification(notificationId: string): Promise<void> {
     try {
-      if (typeof window !== 'undefined') return
+      if (typeof window !== 'undefined') {
+        await fetch('/api/notifications/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: notificationId }) })
+        return
+      }
       await prisma.notification.delete({
         where: { id: notificationId }
       })
@@ -405,9 +419,13 @@ export class NotificationService {
   // Get notification preferences
   static async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
     try {
-      const data = await prisma.notificationPreference.findFirst({
-        where: { user_id: userId }
-      })
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/notifications/preferences', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Failed to fetch preferences')
+        const json = await res.json()
+        return json.data as NotificationPreferences
+      }
+      const data = await prisma.notificationPreference.findFirst({ where: { user_id: userId } })
       
       if (!data) {
         // Create default preferences if none exist
@@ -459,6 +477,12 @@ export class NotificationService {
     preferences: Partial<NotificationPreferences>
   ): Promise<NotificationPreferences> {
     try {
+      if (typeof window !== 'undefined') {
+        const res = await fetch('/api/notifications/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ preferences }) })
+        if (!res.ok) throw new Error('Failed to update preferences')
+        const json = await res.json()
+        return json.data as NotificationPreferences
+      }
       // First try to find existing preferences
       const existing = await prisma.notificationPreference.findFirst({
         where: { user_id: userId }

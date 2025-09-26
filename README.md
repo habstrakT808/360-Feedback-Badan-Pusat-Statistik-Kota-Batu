@@ -9,7 +9,7 @@ BPS Kota Batu 360° Feedback System is a comprehensive performance evaluation pl
 ## 🛠 Tech Stack
 
 - **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
-- **Backend**: Supabase (PostgreSQL, Auth, Real-time)
+- Backend: PostgreSQL + Prisma ORM (Supabase tidak lagi digunakan)
 - **UI/UX**: Framer Motion, Radix UI, Lucide Icons
 - **State Management**: Zustand
 - **Form Handling**: React Hook Form + Zod
@@ -21,7 +21,7 @@ BPS Kota Batu 360° Feedback System is a comprehensive performance evaluation pl
 ```
 bps-feedback/
 ├── 📁 lib/
-│   ├── supabase.ts                    # Supabase client configuration
+// supabase.ts dihapus pada migrasi ke Prisma
 │   ├── database.types.ts              # TypeScript types from database
 │   ├── assessment-data.ts             # Assessment aspects data (7 aspects)
 │   ├── assessment-service.ts          # Assessment operations service
@@ -63,9 +63,7 @@ bps-feedback/
 │   └── 📁 store/
 │       └── useStore.ts                # ✅ Zustand global state
 │
-├── 📁 supabase/
-│   ├── config.toml                    # ✅ Supabase configuration
-│   └── 📁 migrations/                 # ✅ Database migrations
+// Folder `supabase/` tidak digunakan lagi
 │
 ├── .env.local                         # ✅ Environment variables
 ├── package.json                       # ✅ Dependencies
@@ -149,7 +147,7 @@ bps-feedback/
 ### 10. Settings & Profile
 
 - ✅ Halaman Settings untuk mengubah profil
-- ✅ Upload foto profil ke Supabase Storage (bucket `avatars`)
+- ✅ Upload foto profil ke penyimpanan lokal `public/uploads/avatars`
 - ✅ Preview avatar di sidebar/topbar dan halaman Tim
 
 ## 🔄 System Workflow
@@ -318,7 +316,7 @@ CREATE TABLE system_settings (
 
 - Node.js 18+
 - npm or yarn
-- Supabase account
+// Supabase account tidak diperlukan
 - Git
 
 ### Installation Steps
@@ -340,19 +338,19 @@ CREATE TABLE system_settings (
 
    ```bash
    cp .env.example .env.local
-   # Edit .env.local with Supabase credentials
+   # Edit .env.local untuk variabel aplikasi (tanpa Supabase)
    ```
 
 4. **Run database migrations**
 
    ```bash
-   supabase db push
+   # (migrasi menggunakan Prisma, bukan Supabase)
    ```
 
 5. **Generate types**
 
    ```bash
-   supabase gen types typescript --linked > lib/database.types.ts
+   # (tipe digenerate oleh Prisma)
    ```
 
 6. **Start development server**
@@ -362,7 +360,7 @@ CREATE TABLE system_settings (
 
 ### Enable Avatar Storage (Wajib untuk fitur foto profil)
 
-1. Buat bucket di Supabase
+// Tidak perlu bucket Supabase (avatar pakai storage lokal)
 
 ```sql
 insert into storage.buckets (id, name, public)
@@ -407,7 +405,7 @@ to authenticated
 using (bucket_id = 'avatars' and owner = auth.uid());
 ```
 
-3. Tidak perlu perubahan env tambahan. Pastikan `.env.local` sudah berisi `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, dan `SUPABASE_SERVICE_ROLE_KEY` (untuk route admin yang membutuhkan akses server).
+// Variabel env Supabase sudah tidak dipakai
 
 4. Penggunaan di aplikasi
 
@@ -418,14 +416,8 @@ using (bucket_id = 'avatars' and owner = auth.uid());
 ### Environment Variables
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 CRON_SECRET=your_cron_secret_for_automated_tasks
-
-# Optional overrides to define role user IDs without hardcoding in code
-# Comma-separated list of UUIDs
 NEXT_PUBLIC_SUPERVISOR_IDS=
 NEXT_PUBLIC_ADMIN_IDS=
 ```
@@ -472,14 +464,14 @@ export default function NewPage() {
 ```typescript
 export class NewService {
   static async getData() {
-    const { data, error } = await supabase.from("table_name").select("*");
+    // contoh akses DB diganti ke API internal/Prisma
 
     if (error) throw error;
     return data;
   }
 
   static async createData(payload: any) {
-    const { data, error } = await supabase
+    // contoh Supabase dihapus
       .from("table_name")
       .insert(payload)
       .select()
@@ -537,17 +529,10 @@ SELECT * FROM notifications WHERE is_read = false;
 
 ### Database Migration
 
-```bash
-# Push final schema
-supabase db push
-
-# Generate final types
-supabase gen types typescript --linked > lib/database.types.ts
 ```
 
 ### Environment Setup
 
-- Production Supabase project
 - Environment variables in Vercel
 - Domain configuration
 - Email service setup (if required)
@@ -556,7 +541,7 @@ supabase gen types typescript --linked > lib/database.types.ts
 
 ### Monitoring
 
-- Supabase dashboard for database monitoring
+- Database monitoring sesuai platform hosting yang digunakan
 - Vercel analytics for performance
 - Error tracking with console logs
 

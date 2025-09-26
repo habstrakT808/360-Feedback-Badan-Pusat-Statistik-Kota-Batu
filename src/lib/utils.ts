@@ -26,9 +26,6 @@ export function getInitials(name: string) {
 
 // Environment helpers
 export const env = {
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   // Optional overrides: comma-separated user IDs
   supervisorIdsOverride: process.env.NEXT_PUBLIC_SUPERVISOR_IDS || '',
   adminIdsOverride: process.env.NEXT_PUBLIC_ADMIN_IDS || '',

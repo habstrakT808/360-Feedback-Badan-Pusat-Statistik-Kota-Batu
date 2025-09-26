@@ -82,28 +82,36 @@ export async function POST(request: NextRequest) {
     if (!auth.ok) return NextResponse.json({ error: 'Forbidden' }, { status: auth.status })
     const body = await request.json().catch(() => ({}))
     const { year, quarter, start_date, end_date } = body || {}
-    if (!year || !quarter || !start_date || !end_date) {
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    if (!year || !quarter) {
+      return NextResponse.json({ error: 'Missing fields: year and quarter required' }, { status: 400 })
     }
-    // Create assessment periods covering the triwulan months
-    const s = new Date(start_date)
-    const e = new Date(end_date)
-    const months: Array<{ y: number; m: number; sd: Date; ed: Date }> = []
-    for (let d = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1)); d <= e; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
-      const y = d.getUTCFullYear()
-      const m = d.getUTCMonth() + 1
-      const sd = new Date(Date.UTC(y, d.getUTCMonth(), 1))
-      const ed = new Date(Date.UTC(y, d.getUTCMonth() + 1, 0))
-      months.push({ y, m, sd, ed })
-    }
-    for (const mm of months) {
-      const exists = await prisma.assessmentPeriod.findFirst({ where: { year: mm.y, month: mm.m } })
+
+    // Respect custom start/end dates if provided; otherwise default to exact quarter bounds
+    const s = start_date ? new Date(start_date) : new Date(Date.UTC(Number(year), (Number(quarter) - 1) * 3, 1))
+    const e = end_date ? new Date(end_date) : new Date(Date.UTC(Number(year), (Number(quarter) - 1) * 3 + 3, 0))
+
+    for (
+      let d = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
+      d <= e;
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+    ) {
+      const yy = d.getUTCFullYear()
+      const mm = d.getUTCMonth() + 1
+      const isFirst = yy === s.getUTCFullYear() && mm === s.getUTCMonth() + 1
+      const isLast = yy === e.getUTCFullYear() && mm === e.getUTCMonth() + 1
+      const sd = isFirst ? s : new Date(Date.UTC(yy, mm - 1, 1))
+      const ed = isLast ? e : new Date(Date.UTC(yy, mm, 0))
+
+      const exists = await prisma.assessmentPeriod.findFirst({ where: { year: yy, month: mm } })
       if (!exists) {
-        await prisma.assessmentPeriod.create({ data: { year: mm.y, month: mm.m, start_date: mm.sd as any, end_date: mm.ed as any, is_active: false, is_completed: false } })
+        await prisma.assessmentPeriod.create({ data: { year: yy, month: mm, start_date: sd as any, end_date: ed as any, is_active: false, is_completed: false } })
+      } else {
+        await prisma.assessmentPeriod.update({ where: { id: exists.id }, data: { start_date: sd as any, end_date: ed as any } })
       }
     }
+
     const id = `${year}-Q${quarter}`
-    return NextResponse.json({ data: { id, year: Number(year), quarter: Number(quarter), start_date: new Date(start_date), end_date: new Date(end_date) } })
+    return NextResponse.json({ data: { id, year: Number(year), quarter: Number(quarter), start_date: s, end_date: e } })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to create' }, { status: 500 })
   }
@@ -122,16 +130,63 @@ export async function PATCH(request: NextRequest) {
     const oldQuarter = Number(qStr)
     const startMonth = (oldQuarter - 1) * 3 + 1
     const monthsOld = [startMonth, startMonth + 1, startMonth + 2]
-    await prisma.assessmentPeriod.deleteMany({ where: { year: oldYear, month: { in: monthsOld } } })
+    // Gather existing period IDs for the old quarter
+    const oldPeriods = await prisma.assessmentPeriod.findMany({
+      where: { year: oldYear, month: { in: monthsOld } },
+      select: { id: true },
+    })
+    const oldPeriodIds = oldPeriods.map(p => p.id)
+
+    if (oldPeriodIds.length > 0) {
+      // Delete dependents referencing the old periods
+      const oldAssignments = await prisma.assessmentAssignment.findMany({
+        where: { period_id: { in: oldPeriodIds } },
+        select: { id: true },
+      })
+      const oldAssignmentIds = oldAssignments.map(a => a.id)
+      if (oldAssignmentIds.length > 0) {
+        await prisma.feedbackResponse.deleteMany({ where: { assignment_id: { in: oldAssignmentIds } } })
+        await prisma.assessmentAssignment.deleteMany({ where: { id: { in: oldAssignmentIds } } })
+      }
+      await prisma.reminderLog.deleteMany({ where: { period_id: { in: oldPeriodIds } } })
+      await prisma.assessmentHistory.deleteMany({ where: { period_id: { in: oldPeriodIds } } })
+      await prisma.assessmentPeriod.deleteMany({ where: { id: { in: oldPeriodIds } } })
+    }
     const y = Number(year) || oldYear
     const q = Number(quarter) || oldQuarter
+
+    // Determine desired start/end dates. If custom dates supplied, honor them.
     const s = start_date ? new Date(start_date) : new Date(Date.UTC(y, (q - 1) * 3, 1))
     const e = end_date ? new Date(end_date) : new Date(Date.UTC(y, (q - 1) * 3 + 3, 0))
-    for (let m = (q - 1) * 3; m < (q - 1) * 3 + 3; m++) {
-      const sd = new Date(Date.UTC(y, m, 1))
-      const ed = new Date(Date.UTC(y, m + 1, 0))
-      await prisma.assessmentPeriod.create({ data: { year: y, month: m + 1, start_date: sd as any, end_date: ed as any, is_active: false, is_completed: false } })
+
+    // Recreate monthly periods covering [s, e]
+    for (
+      let d = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
+      d <= e;
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+    ) {
+      const mmY = d.getUTCFullYear()
+      const mmM = d.getUTCMonth() + 1
+
+      // For first and last month, keep exact s/e if inside the month; otherwise use month bounds
+      const isFirstMonth = mmY === s.getUTCFullYear() && mmM === s.getUTCMonth() + 1
+      const isLastMonth = mmY === e.getUTCFullYear() && mmM === e.getUTCMonth() + 1
+
+      const monthStart = isFirstMonth ? s : new Date(Date.UTC(mmY, mmM - 1, 1))
+      const monthEnd = isLastMonth ? e : new Date(Date.UTC(mmY, mmM, 0))
+
+      await prisma.assessmentPeriod.create({
+        data: {
+          year: mmY,
+          month: mmM,
+          start_date: monthStart as any,
+          end_date: monthEnd as any,
+          is_active: false,
+          is_completed: false,
+        },
+      })
     }
+
     return NextResponse.json({ data: { id: `${y}-Q${q}`, year: y, quarter: q, start_date: s, end_date: e } })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to update' }, { status: 500 })
@@ -145,13 +200,42 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-    // Delete all assessment periods within that quarter
+    // Resolve quarter months and gather affected period IDs
     const [yrStr, qStr] = String(id).split('-Q')
     const y = Number(yrStr)
     const q = Number(qStr)
     const startMonth = (q - 1) * 3 + 1
     const months = [startMonth, startMonth + 1, startMonth + 2]
-    await prisma.assessmentPeriod.deleteMany({ where: { year: y, month: { in: months } } })
+
+    const periods = await prisma.assessmentPeriod.findMany({
+      where: { year: y, month: { in: months } },
+      select: { id: true },
+    })
+    const periodIds = periods.map(p => p.id)
+
+    if (periodIds.length === 0) {
+      return NextResponse.json({ success: true })
+    }
+
+    // Delete dependent records in safe order
+    const assignments = await prisma.assessmentAssignment.findMany({
+      where: { period_id: { in: periodIds } },
+      select: { id: true },
+    })
+    const assignmentIds = assignments.map(a => a.id)
+
+    if (assignmentIds.length > 0) {
+      await prisma.feedbackResponse.deleteMany({ where: { assignment_id: { in: assignmentIds } } })
+      await prisma.assessmentAssignment.deleteMany({ where: { id: { in: assignmentIds } } })
+    }
+
+    // Other tables referencing period_id directly
+    await prisma.reminderLog.deleteMany({ where: { period_id: { in: periodIds } } })
+    await prisma.assessmentHistory.deleteMany({ where: { period_id: { in: periodIds } } })
+
+    // Finally delete periods
+    await prisma.assessmentPeriod.deleteMany({ where: { id: { in: periodIds } } })
+
     return NextResponse.json({ success: true })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to delete' }, { status: 500 })
