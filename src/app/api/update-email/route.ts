@@ -15,15 +15,25 @@ export async function POST(request: NextRequest) {
 
     const userId = session.user.id as string;
 
+    // Get current user email to update profile
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    if (!currentUser?.email) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
     // Update email in users table
     await prisma.user.update({
       where: { id: userId },
       data: { email: newEmail }
     });
 
-    // Also update the profiles table
-    await prisma.profile.update({
-      where: { id: userId },
+    // Also update the profiles table using current email
+    await prisma.profile.updateMany({
+      where: { email: currentUser.email },
       data: { email: newEmail }
     });
 
