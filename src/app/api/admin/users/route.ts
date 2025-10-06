@@ -24,7 +24,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    const profiles = await prisma.profile.findMany({ orderBy: { created_at: 'desc' }, select: { id: true, full_name: true, email: true, position: true, department: true, created_at: true } })
+    const profiles = await prisma.profile.findMany({
+      orderBy: { created_at: 'desc' },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        username: true,
+        position: true,
+        department: true,
+        created_at: true,
+      },
+    })
     const adminUsers = await prisma.userRole.findMany({ where: { role: 'admin' }, select: { user_id: true } })
     const adminIds = new Set(
       adminUsers.map((u: { user_id: string | null }) => u.user_id).filter((id: string | null): id is string => !!id)

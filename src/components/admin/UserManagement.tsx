@@ -24,11 +24,13 @@ import { toast } from "react-hot-toast";
 interface UserManagementProps {
   onCreateUser: () => void;
   onEditUser: (user: any) => void;
+  refreshKey?: number;
 }
 
 export function UserManagement({
   onCreateUser,
   onEditUser,
+  refreshKey,
 }: UserManagementProps) {
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +43,13 @@ export function UserManagement({
   useEffect(() => {
     loadUsers();
   }, []);
+
+  // Reload users when parent signals a refresh
+  useEffect(() => {
+    if (typeof refreshKey !== 'undefined') {
+      loadUsers();
+    }
+  }, [refreshKey]);
 
   const loadUsers = async () => {
     try {

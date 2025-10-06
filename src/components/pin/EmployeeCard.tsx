@@ -14,6 +14,8 @@ interface EmployeeCardProps {
   canGivePin: boolean;
   isGivingPin: boolean;
   isCurrentUser?: boolean;
+  hasGivenPin?: boolean;
+  givenPinCount?: number;
 }
 
 export function EmployeeCard({
@@ -22,6 +24,8 @@ export function EmployeeCard({
   canGivePin,
   isGivingPin,
   isCurrentUser = false,
+  hasGivenPin = false,
+  givenPinCount = 0,
 }: EmployeeCardProps) {
   const getInitials = (name: string) => {
     return name
@@ -55,9 +59,16 @@ export function EmployeeCard({
             <h3 className="text-xl font-bold text-gray-900">
               {employee.full_name}
             </h3>
-            {isCurrentUser && (
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                Anda
+          {isCurrentUser && (
+            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+              Anda
+            </span>
+          )}
+            {(hasGivenPin || givenPinCount > 0) && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full" title="Pin diberikan">
+                {Array.from({ length: Math.max(1, givenPinCount) }).map((_, i) => (
+                  <Pin key={i} className="w-3 h-3 text-red-600" />
+                ))}
               </span>
             )}
           </div>

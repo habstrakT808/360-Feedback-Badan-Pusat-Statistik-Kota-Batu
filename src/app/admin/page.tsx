@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [isCreatePeriodModalOpen, setIsCreatePeriodModalOpen] = useState(false);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [usersRefreshKey, setUsersRefreshKey] = useState(0);
 
   useEffect(() => {
     loadStats();
@@ -83,6 +84,8 @@ export default function AdminPage() {
   const handleUserUpdated = () => {
     // Refresh stats after updating a user
     loadStats();
+    // Also refresh user list so edited fields (e.g., username) show up
+    setUsersRefreshKey((k) => k + 1);
   };
 
   if (isLoading) {
@@ -161,6 +164,7 @@ export default function AdminPage() {
                     <UserManagement
                       onCreateUser={handleCreateUser}
                       onEditUser={handleEditUser}
+                      refreshKey={usersRefreshKey}
                     />
                   </div>
                   <div>
@@ -174,6 +178,7 @@ export default function AdminPage() {
               <UserManagement
                 onCreateUser={handleCreateUser}
                 onEditUser={handleEditUser}
+                refreshKey={usersRefreshKey}
               />
             )}
 

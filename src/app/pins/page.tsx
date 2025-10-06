@@ -45,6 +45,8 @@ export default function PinsPage() {
   const [activePinPeriod, setActivePinPeriod] = useState<any | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [givenReceiverIds, setGivenReceiverIds] = useState<string[]>([]);
+  const [givenReceiverCounts, setGivenReceiverCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (isAdmin) {
@@ -91,10 +93,19 @@ export default function PinsPage() {
             ? { start: new Date(activePinPeriod.start_date).toISOString().slice(0,10), end: new Date(activePinPeriod.end_date).toISOString().slice(0,10) }
             : 'active')
 
-      const [monthly, allowance, members] = await Promise.all([
+      // Pastikan riwayat menggunakan periode yang sama dengan UI (bulan/tahun terpilih atau aktif)
+      const historyUrl = (() => {
+        const qs = new URLSearchParams()
+        qs.set('month', String(targetMonth))
+        qs.set('year', String(targetYear))
+        return `/api/pins/history?${qs.toString()}`
+      })()
+
+      const [monthly, allowance, members, history] = await Promise.all([
         PinService.getPinRankings(50, rankingPeriod),
         PinService.getWeeklyPinAllowance(user!.id, targetMonth, targetYear),
         PinService.getParticipants(),
+        fetch(historyUrl, { cache: 'no-store' }).then(r => r.json()).then(j => (Array.isArray(j?.pins) ? j.pins : [])),
       ]);
 
       // Debug: Log semua user ID untuk mengidentifikasi duplikat
@@ -113,6 +124,21 @@ export default function PinsPage() {
       setTeamMembers(members);
       setPinsRemaining(allowance?.pins_remaining || 0);
       setActivePinPeriod(pinPeriod);
+      // Tandai user yang sudah diberi pin oleh current user.
+      // API /api/pins/history (tanpa receiverId) sudah otomatis mengembalikan
+      // pin yang DIBERIKAN oleh pengguna saat ini pada periode aktif.
+      // Jadi kita tidak perlu memfilter lagi berdasarkan giver_id,
+      // cukup kumpulkan semua receiver_id dari hasil tersebut.
+      const receivers = Array.isArray(history)
+        ? history.filter((h: any) => !!h.receiver_id)
+        : [];
+      const counts: Record<string, number> = {};
+      for (const h of receivers) {
+        const rid = h.receiver_id as string;
+        counts[rid] = (counts[rid] || 0) + 1;
+      }
+      setGivenReceiverCounts(counts);
+      setGivenReceiverIds(Object.keys(counts));
       // Sinkronkan filter UI ke periode aktif bila belum dipilih
       if (pinPeriod && (selectedMonth === null || selectedYear === null)) {
         setSelectedMonth(pinPeriod.month ?? currentMonth);
@@ -385,6 +411,8 @@ export default function PinsPage() {
                       }
                       isGivingPin={isGivingPin}
                       isCurrentUser={member.id === user?.id}
+                      hasGivenPin={givenReceiverIds.includes(member.id)}
+                      givenPinCount={givenReceiverCounts[member.id] || 0}
                     />
                   ))}
                 </div>
