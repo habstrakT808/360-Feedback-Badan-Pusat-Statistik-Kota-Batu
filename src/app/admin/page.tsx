@@ -20,6 +20,7 @@ import {
 import { toast } from "react-hot-toast";
 import { AdminGuard } from "@/components/auth/AdminGuard";
 import { CreatePeriodModal } from "@/components/admin/CreatePeriodModal";
+import { CreateUserModal } from "@/components/admin/CreateUserModal";
 import { EditUserModal } from "@/components/admin/EditUserModal";
 import { PinPeriodAdmin } from "@/components/admin/PinPeriodAdmin";
 import { TriwulanPeriodAdmin } from "@/components/admin/TriwulanPeriodAdmin";
@@ -30,6 +31,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatePeriodModalOpen, setIsCreatePeriodModalOpen] = useState(false);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [usersRefreshKey, setUsersRefreshKey] = useState(0);
@@ -60,7 +62,7 @@ export default function AdminPage() {
   ];
 
   const handleCreateUser = () => {
-    toast.success("Create user modal will be implemented");
+    setIsCreateUserModalOpen(true);
   };
 
   const handleEditUser = (user: any) => {
@@ -79,6 +81,13 @@ export default function AdminPage() {
   const handlePeriodCreated = () => {
     // Refresh stats after creating a new period
     loadStats();
+  };
+
+  const handleUserCreated = () => {
+    // Refresh stats after creating a new user
+    loadStats();
+    // Also refresh user list
+    setUsersRefreshKey((k) => k + 1);
   };
 
   const handleUserUpdated = () => {
@@ -226,6 +235,13 @@ export default function AdminPage() {
         isOpen={isCreatePeriodModalOpen}
         onClose={() => setIsCreatePeriodModalOpen(false)}
         onSuccess={handlePeriodCreated}
+      />
+
+      {/* Create User Modal */}
+      <CreateUserModal
+        isOpen={isCreateUserModalOpen}
+        onClose={() => setIsCreateUserModalOpen(false)}
+        onUserCreated={handleUserCreated}
       />
 
       {/* Edit User Modal */}

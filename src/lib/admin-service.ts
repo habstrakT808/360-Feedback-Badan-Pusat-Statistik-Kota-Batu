@@ -57,13 +57,34 @@ export class AdminService {
     email: string
     password: string
     full_name: string
+    username: string
     position: string
     department: string
   }) {
-    // Note: This requires admin privileges and should be done server-side
-    // For now, return a placeholder response
-    console.warn('createUser should be implemented server-side')
-    return { id: 'placeholder', email: userData.email }
+    try {
+      const response = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(userData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create user')
+      }
+
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create user')
+      }
+
+      return result.user
+    } catch (error) {
+      console.error('Error creating user:', error)
+      throw error
+    }
   }
 
   static async updateUser(userId: string, updates: Partial<Profile>) {
