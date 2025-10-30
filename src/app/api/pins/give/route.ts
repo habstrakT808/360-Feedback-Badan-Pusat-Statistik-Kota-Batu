@@ -28,42 +28,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Out of active period range' }, { status: 400 })
   }
 
-  // Ensure allowance exists
-  const allowance = await prisma.monthlyPinAllowance.findFirst({
-    where: { user_id: giverId, month: active.month ?? undefined, year: active.year ?? undefined },
+  // Enforce allowance per active period by counting existing given pins in window
+  const start = new Date(active.start_date)
+  const endPlusOne = new Date(new Date(active.end_date).getTime() + 24*60*60*1000)
+
+  const alreadyUsed = await prisma.employeePin.count({
+    where: {
+      giver_id: giverId,
+      given_at: { gte: start, lt: endPlusOne },
+    },
   })
+
+  if (alreadyUsed >= 4) {
+    return NextResponse.json({ error: 'No pins remaining' }, { status: 400 })
+  }
 
   const month = active.month ?? new Date().getMonth() + 1
   const year = active.year ?? new Date().getFullYear()
 
   try {
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      let current = allowance
-      if (!current) {
-        current = await tx.monthlyPinAllowance.create({
-          data: { user_id: giverId, month, year, pins_remaining: 4, pins_used: 0 },
-        })
-      }
-      if (current.pins_remaining <= 0) throw new Error('No pins remaining')
-
-      await tx.employeePin.create({
-        data: {
-          giver_id: giverId,
-          receiver_id: receiverId,
-          week_number: getWeekNumber(new Date()),
-          month,
-          year,
-        },
-      })
-
-      const updated = await tx.monthlyPinAllowance.update({
-        where: { id: current.id },
-        data: { pins_remaining: current.pins_remaining - 1, pins_used: current.pins_used + 1 },
-      })
-      return updated
+    await prisma.employeePin.create({
+      data: {
+        giver_id: giverId,
+        receiver_id: receiverId,
+        week_number: getWeekNumber(new Date()),
+        month,
+        year,
+      },
     })
 
-    return NextResponse.json({ success: true, allowance: { pins_remaining: result.pins_remaining, pins_used: result.pins_used } })
+    const usedNow = alreadyUsed + 1
+    return NextResponse.json({ success: true, allowance: { pins_remaining: Math.max(0, 4 - usedNow), pins_used: usedNow } })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to give pin' }, { status: 400 })
   }

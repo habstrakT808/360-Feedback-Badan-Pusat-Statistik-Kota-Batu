@@ -17,42 +17,37 @@ export async function GET() {
   const profileId = prof?.id
   if (!profileId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Resolve target month/year using active pin period if exists
+  // Use active pin period; if none, fallback to current month but still compute by counting pins in month
   const active = await prisma.pinPeriod.findFirst({ where: { is_active: true } })
-  const month = active?.month ?? nowMonthYear().month
-  const year = active?.year ?? nowMonthYear().year
 
-  // Upsert monthly allowance
-  const existing = await prisma.monthlyPinAllowance.findFirst({
-    where: { user_id: profileId, month, year },
+  // Compute date window
+  const start = active ? new Date(active.start_date) : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+  const endPlusOne = active
+    ? new Date(new Date(active.end_date).getTime() + 24*60*60*1000)
+    : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
+
+  // Count pins given by this user in the window
+  const used = await prisma.employeePin.count({
+    where: {
+      giver_id: profileId,
+      given_at: { gte: start, lt: endPlusOne },
+    },
   })
 
-  if (!existing) {
-    const created = await prisma.monthlyPinAllowance.create({
-      data: {
-        user_id: profileId,
-        month,
-        year,
-        pins_remaining: 4,
-        pins_used: 0,
-      },
-    })
-    return NextResponse.json({ allowance: {
-      user_id: created.user_id,
-      month: created.month,
-      year: created.year,
-      pins_remaining: created.pins_remaining,
-      pins_used: created.pins_used,
-    }})
-  }
+  const remaining = Math.max(0, 4 - used)
 
-  return NextResponse.json({ allowance: {
-    user_id: existing.user_id,
-    month: existing.month,
-    year: existing.year,
-    pins_remaining: existing.pins_remaining,
-    pins_used: existing.pins_used,
-  }})
+  const periodMonth = active?.month ?? nowMonthYear().month
+  const periodYear = active?.year ?? nowMonthYear().year
+
+  return NextResponse.json({
+    allowance: {
+      user_id: profileId,
+      month: periodMonth,
+      year: periodYear,
+      pins_remaining: remaining,
+      pins_used: used,
+    },
+  })
 }
 
 
