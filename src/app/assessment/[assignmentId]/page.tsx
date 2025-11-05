@@ -295,7 +295,7 @@ export default function RegularAssessmentPage() {
                 ) : (
                   <span className="text-blue-700 font-bold text-2xl">
                     {assignment.assessee?.full_name?.charAt(0) || assignment.assessee?.email?.charAt(0) || "?"}
-                  </span>
+                </span>
                 )}
               </div>
               <div>
