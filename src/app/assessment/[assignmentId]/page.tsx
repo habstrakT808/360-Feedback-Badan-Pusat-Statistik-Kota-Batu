@@ -222,6 +222,38 @@ export default function RegularAssessmentPage() {
   return (
     <DashboardLayout>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+        {/* Sticky assessee header */}
+        {assignment && (
+          <div className="sticky top-3 z-30">
+            <div className="max-w-4xl mx-auto px-0">
+              <div className="ml-auto w-full max-w-xs rounded-2xl shadow-xl bg-white/90 backdrop-blur ring-1 ring-gray-200 px-3 py-2">
+                <div className="text-sm font-semibold text-gray-900 truncate mb-2 text-right">
+                  {assignment.assessee?.full_name || assignment.assessee?.email}
+                </div>
+                {(() => {
+                const total = ASSESSMENT_ASPECTS.length;
+                const filled = ASSESSMENT_ASPECTS.filter(a => {
+                  const r = responses[a.id];
+                  return r && typeof r.rating === 'number';
+                }).length;
+                const percent = Math.round((filled / total) * 100);
+                return (
+                    <div className="hidden sm:flex items-center gap-2 justify-end">
+                      <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          className="h-full bg-gradient-to-r from-blue-500 to-indigo-600"
+                        />
+                      </div>
+                      <div className="text-[10px] font-medium text-gray-700">{percent}%</div>
+                    </div>
+                );
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -249,14 +281,22 @@ export default function RegularAssessmentPage() {
             </div>
           </div>
 
-          {/* User Info Card */}
+          {/* User Info Card */
+          }
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-2xl">
-                  {assignment.assessee?.full_name?.charAt(0) ||
-                    assignment.assessee?.email?.charAt(0)}
-                </span>
+              <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-blue-100 bg-blue-50 flex items-center justify-center">
+                {assignment.assessee?.avatar_url ? (
+                  <img
+                    src={assignment.assessee.avatar_url}
+                    alt={assignment.assessee?.full_name || assignment.assessee?.email || "Avatar"}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-blue-700 font-bold text-2xl">
+                    {assignment.assessee?.full_name?.charAt(0) || assignment.assessee?.email?.charAt(0) || "?"}
+                  </span>
+                )}
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">

@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Not enough eligible users to generate assignments' }, { status: 400 })
     }
 
-    // Read existing assignments to avoid duplicates
+    // Read existing assignments to avoid duplicates and compute current in-degree (received assessments)
     const existing = await prisma.assessmentAssignment.findMany({
       where: { period_id: targetPeriodId },
       select: { assessor_id: true, assessee_id: true }
@@ -60,24 +60,63 @@ export async function POST(request: NextRequest) {
     const existingPairs = new Set(
       existing.map((e: { assessor_id: string | null; assessee_id: string | null }) => `${e.assessor_id}:${e.assessee_id}`)
     )
+    const inCount = new Map<string, number>()
+    for (const e of existing) {
+      if (!e.assessee_id) continue
+      inCount.set(e.assessee_id, (inCount.get(e.assessee_id) || 0) + 1)
+    }
 
-    // For each assessor, pick up to 5 unique assessees (not self), avoiding duplicates
+    // Balanced generation:
+    // - Set target per assessor (max 5 or pool-1)
+    // - Cap per assessee so setiap orang menerima ~target penilai
+    const targetPerAssessor = Math.max(1, Math.min(5, eligible.length - 1))
+    const capPerAssessee = targetPerAssessor
+
     const toCreate: Array<{ assessor_id: string, assessee_id: string, period_id: string }> = []
+
+    // Helper to pick candidates sorted by current received count (lowest first), with random tie-breaker
+    function sortedCandidates(base: string[]): string[] {
+      const arr = base.slice()
+      return arr.sort((a: string, b: string) => {
+        const ca = inCount.get(a) || 0
+        const cb = inCount.get(b) || 0
+        if (ca !== cb) return ca - cb
+        return Math.random() - 0.5
+      })
+    }
+
+    // First pass: respect capPerAssessee to even out distribution
     for (const assessor of eligible) {
-      // shuffle a copy
-      const pool = eligible.filter(id => id !== assessor)
-      for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp
-      }
+      const pool = sortedCandidates(eligible.filter((id) => id !== assessor))
       let added = 0
       for (const assessee of pool) {
-        if (added >= 5) break
+        if (added >= targetPerAssessor) break
+        const key = `${assessor}:${assessee}`
+        if (existingPairs.has(key)) continue
+        const current = inCount.get(assessee) || 0
+        if (current >= capPerAssessee) continue
+        existingPairs.add(key)
+        inCount.set(assessee, current + 1)
+        toCreate.push({ assessor_id: assessor, assessee_id: assessee, period_id: targetPeriodId! })
+        added++
+      }
+    }
+
+    // Second pass: if ada assessor yang belum mencapai target karena cap, isi sisa tanpa cap (tetap hindari duplikasi)
+    for (const assessor of eligible) {
+      // Count what we've already added for this assessor in the new batch + existing
+      let already = existing.filter(e => e.assessor_id === assessor).length +
+        toCreate.filter(t => t.assessor_id === assessor).length
+      if (already >= targetPerAssessor) continue
+      const pool = sortedCandidates(eligible.filter((id) => id !== assessor))
+      for (const assessee of pool) {
+        if (already >= targetPerAssessor) break
         const key = `${assessor}:${assessee}`
         if (existingPairs.has(key)) continue
         existingPairs.add(key)
+        inCount.set(assessee, (inCount.get(assessee) || 0) + 1)
         toCreate.push({ assessor_id: assessor, assessee_id: assessee, period_id: targetPeriodId! })
-        added++
+        already++
       }
     }
 

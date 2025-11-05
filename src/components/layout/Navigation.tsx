@@ -91,6 +91,20 @@ export function Navigation() {
       }
     };
     loadProfile();
+    const onProfileUpdated = (e: any) => {
+      const updated = e?.detail;
+      if (updated && updated.id === user?.id) {
+        setProfile((prev: any) => ({ ...(prev || {}), ...updated }));
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('profile-updated', onProfileUpdated as any);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('profile-updated', onProfileUpdated as any);
+      }
+    };
   }, [user?.id]);
 
   const handleLogout = async () => {

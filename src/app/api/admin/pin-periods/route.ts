@@ -21,6 +21,15 @@ export async function GET(request: NextRequest) {
     if (role?.role !== 'admin' && role?.role !== 'supervisor') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
+
+    // Tandai otomatis sebagai selesai jika tanggal berakhir sudah lewat
+    try {
+      const now = new Date()
+      await prisma.pinPeriod.updateMany({
+        where: { end_date: { lt: now }, is_completed: false },
+        data: { is_completed: true, is_active: false },
+      })
+    } catch {}
     const activeOnly = searchParams.get('active') === '1'
     if (activeOnly) {
       const active = await prisma.pinPeriod.findFirst({ where: { is_active: true } })

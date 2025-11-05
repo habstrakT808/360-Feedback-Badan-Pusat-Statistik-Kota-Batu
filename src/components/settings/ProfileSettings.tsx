@@ -101,6 +101,11 @@ export function ProfileSettings({ profile, onUpdate }: ProfileSettingsProps) {
     try {
       const updated = await SettingsService.uploadAvatar(user.id, file);
       onUpdate(updated);
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('profile-updated', { detail: updated }));
+        }
+      } catch {}
       toast.success("Avatar berhasil diperbarui");
     } catch (error: any) {
       toast.error(error.message || "Gagal mengupload avatar");

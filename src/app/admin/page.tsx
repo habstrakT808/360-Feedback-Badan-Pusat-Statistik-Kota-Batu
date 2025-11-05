@@ -25,6 +25,7 @@ import { EditUserModal } from "@/components/admin/EditUserModal";
 import { PinPeriodAdmin } from "@/components/admin/PinPeriodAdmin";
 import { TriwulanPeriodAdmin } from "@/components/admin/TriwulanPeriodAdmin";
 import { AdminExportButton } from "@/components/export/AdminExportButton";
+import { PinMonitoringAdmin } from "@/components/admin/PinMonitoringAdmin";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -41,10 +42,10 @@ export default function AdminPage() {
   }, []);
 
   const loadStats = async () => {
-    try {
+  	try {
       const data = await AdminService.getSystemStats();
       setStats(data);
-    } catch (error: any) {
+  	} catch {
       toast.error("Failed to load system stats");
     } finally {
       setIsLoading(false);
@@ -54,7 +55,7 @@ export default function AdminPage() {
   const tabs = [
     { id: "overview", name: "Overview", icon: BarChart3 },
     { id: "users", name: "Users", icon: Users },
-    { id: "periods", name: "Periods", icon: Calendar },
+    { id: "periods", name: "360 Periods", icon: Calendar },
     { id: "pin_periods", name: "Pin Periods", icon: Calendar },
     { id: "triwulan_periods", name: "Triwulan Periods", icon: Calendar },
     { id: "activity", name: "Activity", icon: Activity },
@@ -74,7 +75,7 @@ export default function AdminPage() {
     setIsCreatePeriodModalOpen(true);
   };
 
-  const handleEditPeriod = (period: any) => {
+  const handleEditPeriod = () => {
     // This is now handled in PeriodManagement component
   };
 
@@ -224,7 +225,10 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === "pin_periods" && <PinPeriodAdmin />}
+            {activeTab === "pin_periods" && (
+              <PinPeriodAdmin onOpenMonitoring={() => setActiveTab("pin_monitoring")} />
+            )}
+            {activeTab === "pin_monitoring" && <PinMonitoringAdmin />}
             {activeTab === "triwulan_periods" && <TriwulanPeriodAdmin />}
           </motion.div>
         </div>

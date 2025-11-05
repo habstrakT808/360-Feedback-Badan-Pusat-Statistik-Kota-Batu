@@ -2,11 +2,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Plus, Edit, Trash2, RotateCcw } from "lucide-react";
+import { Calendar, Plus, Edit, Trash2, RotateCcw, Activity } from "lucide-react";
 import { PinPeriodService } from "@/lib/pin-period-service";
 import { toast } from "react-hot-toast";
 
-export function PinPeriodAdmin() {
+type PinPeriodAdminProps = {
+  onOpenMonitoring?: () => void
+}
+
+export function PinPeriodAdmin({ onOpenMonitoring }: PinPeriodAdminProps) {
   const [periods, setPeriods] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -142,6 +146,13 @@ export function PinPeriodAdmin() {
           <p className="text-gray-600">Atur tanggal mulai dan selesai pin</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => onOpenMonitoring && onOpenMonitoring()}
+            className="flex items-center space-x-2 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            <Activity className="w-4 h-4" />
+            <span>Pin Monitoring</span>
+          </button>
           <button
             onClick={openCreate}
             className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700"

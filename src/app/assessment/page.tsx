@@ -158,11 +158,18 @@ function RegularUserAssessment() {
                   >
                     {statusLabel}
                   </span>
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-white font-bold text-xl">
-                      {assignment.assessee?.full_name?.charAt(0) ||
-                        assignment.assessee?.email?.charAt(0)}
-                    </span>
+                  <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-blue-100 bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                    {assignment.assessee?.avatar_url ? (
+                      <img
+                        src={assignment.assessee.avatar_url}
+                        alt={assignment.assessee?.full_name || assignment.assessee?.email || 'Avatar'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-blue-700 font-bold text-xl">
+                        {assignment.assessee?.full_name?.charAt(0) || assignment.assessee?.email?.charAt(0) || '?'}
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
                     {assignment.assessee?.full_name ||
@@ -337,10 +344,18 @@ function SupervisorAssessment() {
                   >
                     {statusLabel}
                   </span>
-                  <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-white font-bold text-xl">
-                      {u.full_name?.charAt(0) || u.email?.charAt(0)}
-                    </span>
+                  <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-purple-100 bg-purple-50 flex items-center justify-center mx-auto mb-4">
+                    {u.avatar_url ? (
+                      <img
+                        src={u.avatar_url}
+                        alt={u.full_name || u.email || 'Avatar'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-purple-700 font-bold text-xl">
+                        {u.full_name?.charAt(0) || u.email?.charAt(0) || '?'}
+                      </span>
+                    )}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
                     {u.full_name || u.email}

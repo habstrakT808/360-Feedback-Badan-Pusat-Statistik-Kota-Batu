@@ -109,34 +109,11 @@ export default function TriwulanAssessmentPage() {
             setStep("waiting");
           }
         } else {
-          // If 5 or fewer candidates, automatically set shortlist and go to rating
+          // Jika kandidat <= 5: tampilkan layar "Kandidat Terpilih" terlebih dahulu
+          // Pengguna memilih kandidat sebelum masuk ke penilaian
           setShortlisted((cand || []).map((c: any) => c.user_id));
-          if (editMode) {
-            setStep('shortlist')
-          } else {
-            // Check if user has already completed ratings for all candidates
-            if (uid) {
-              try {
-                const existingMap = await TriwulanService.getUserRatingsMap(p.id, uid);
-                const allRated = (cand || []).every((c: any) => {
-                  const rts = existingMap[c.user_id];
-                  return Array.isArray(rts) && rts.length === 13 && rts.every(Boolean);
-                });
-                if (allRated) {
-                  setStep("shortlist");
-                } else {
-                  setStep("rate");
-                  setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
-                }
-              } catch {
-                setStep("rate");
-                setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
-              }
-            } else {
-              setStep("rate");
-              setActiveCandidateId((cand || []).map((c: any) => c.user_id)[0] || null);
-            }
-          }
+          setActiveCandidateId(null);
+          setStep('shortlist');
         }
 
         // Load profile names for display (via API, not Prisma in client)

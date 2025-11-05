@@ -34,6 +34,7 @@ export default function SupervisorAssessmentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasExistingAssessment, setHasExistingAssessment] = useState(false);
+  const [peerAspectAverage, setPeerAspectAverage] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
     if (user && userId) {
@@ -115,6 +116,18 @@ export default function SupervisorAssessmentPage() {
         });
         setResponses(responseMap);
       }
+
+      // Fetch peer averages per aspect for this assessee to display live final score
+      try {
+        const res = await fetch(`/api/results/weighted?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' })
+        if (res.ok) {
+          const json = await res.json().catch(() => null)
+          const map: Record<string, number | null> = {}
+          const arr = (json?.aspectResults || []) as Array<{ aspect: string; peerAverage: number | null }>
+          arr.forEach((a) => { map[a.aspect] = typeof a.peerAverage === 'number' ? a.peerAverage : null })
+          setPeerAspectAverage(map)
+        }
+      } catch {}
     } catch (error: any) {
       console.error("Error loading data:", error);
       toast.error("Gagal memuat data: " + error.message);
@@ -283,6 +296,38 @@ export default function SupervisorAssessmentPage() {
   return (
     <DashboardLayout>
       <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+        {/* Sticky target user header (floating) */}
+        {targetUser && (
+          <div className="sticky top-3 z-30">
+            <div className="max-w-4xl mx-auto px-0">
+              <div className="ml-auto w-full max-w-xs rounded-2xl shadow-xl bg-white/90 backdrop-blur ring-1 ring-gray-200 px-3 py-2">
+                <div className="text-sm font-semibold text-gray-900 truncate mb-1.5 text-right">
+                  {targetUser.full_name || targetUser.email}
+                </div>
+                {(() => {
+                  const total = ASSESSMENT_ASPECTS.length
+                  const filled = ASSESSMENT_ASPECTS.filter(a => {
+                    const r = responses[a.id]
+                    return r && typeof r.rating === 'number'
+                  }).length
+                  const percent = Math.round((filled / total) * 100)
+                  return (
+                    <div className="hidden sm:flex items-center gap-2 justify-end">
+                      <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-600"
+                        />
+                      </div>
+                      <div className="text-[10px] font-medium text-gray-700">{percent}%</div>
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -312,11 +357,18 @@ export default function SupervisorAssessmentPage() {
           {/* User Info Card */}
           <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
             <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-2xl">
-                  {targetUser.full_name?.charAt(0) ||
-                    targetUser.email?.charAt(0)}
-                </span>
+              <div className="w-16 h-16 rounded-full overflow-hidden ring-2 ring-purple-100 bg-purple-50 flex items-center justify-center">
+                {targetUser.avatar_url ? (
+                  <img
+                    src={targetUser.avatar_url}
+                    alt={targetUser.full_name || targetUser.email || 'Avatar'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-purple-700 font-bold text-2xl">
+                    {targetUser.full_name?.charAt(0) || targetUser.email?.charAt(0) || '?'}
+                  </span>
+                )}
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -371,8 +423,29 @@ export default function SupervisorAssessmentPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: aspectIndex * 0.1 }}
-                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100"
+                className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative"
               >
+                {/* Top-right live score badges */}
+                {(() => {
+                  const sup = responses[aspect.id]?.rating as number | undefined
+                  const peer = peerAspectAverage[aspect.id]
+                  const coworker = typeof peer === 'number' ? Math.round(peer) : null
+                  let final: number | null = null
+                  if (typeof sup === 'number' && typeof peer === 'number') final = Math.round(sup * 0.6 + peer * 0.4)
+                  else if (typeof sup === 'number') final = Math.round(sup)
+                  else if (typeof peer === 'number') final = Math.round(peer)
+                  if (coworker === null && final === null) return null
+                  return (
+                    <div className="absolute right-4 top-4 flex items-center gap-2">
+                      {coworker !== null && (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">Skor Rekan: {coworker}</span>
+                      )}
+                      {final !== null && (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">Skor Final: {final}</span>
+                      )}
+                    </div>
+                  )
+                })()}
                 <div className="mb-6">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
                     {aspect.name}
